@@ -1,0 +1,216 @@
+// ===== generator =====
+generator client {
+  provider = "prisma-client-js"
+}
+
+// ===== datasource =====
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ===== enums =====
+enum Role {
+  USER
+  ADMIN
+}
+
+enum AccountStatus {
+  ACTIVE
+  TEMPSUSPEND
+  SUSPENDED
+}
+
+enum Condition {
+  NEW
+  USED
+}
+
+enum Category {
+  BOOKS
+  CLOTHES
+  GADGET
+  FURNITURE
+  SPORTS
+  STATIONERY
+  ELECTRONICS
+  VEHICLES
+  MUSIC
+  OTHERS
+}
+
+/**
+ * 👉 เวิร์กโฟลว์ Offer
+ */
+enum OfferStatus {
+  REQUESTED // ผู้ซื้อเพิ่งเสนอ
+  ACCEPTED // ฝั่งตรงข้ามยอมรับ (มี qrToken), Listing ควรเป็น PENDING (ถ้าใช้)
+  REJECTED
+  REOFFER // ฝ่ายตรงข้ามปรับวันเวลา/สถานที่
+  COMPLETED // ยืนยันสำเร็จ
+  CANCELLED // เผื่ออนาคต
+}
+
+enum OfferActor {
+  BUYER
+  SELLER
+}
+
+/**
+ * ประเภทการแจ้งเตือน
+ */
+enum NotificationType {
+  OFFER_REQUESTED
+  OFFER_ACCEPTED
+  OFFER_REJECTED
+  OFFER_REOFFER
+  OFFER_COMPLETED
+}
+
+/**
+ * (ออปชัน) สถานะรายการขาย สำหรับรองรับ Pending หลัง Accept
+ */
+enum ListingStatus {
+  ACTIVE
+  PENDING
+  SOLD
+  HIDDEN
+}
+
+// ===== models =====
+model User {
+  id           String  @id @default(cuid())
+  email        String  @unique
+  passwordHash String
+  name         String? // ไม่ unique เพื่อรองรับชื่อซ้ำ
+  avatarUrl    String?
+  bio          String?
+
+  // ออปชันไว้รองรับหลายมหาลัย/รูปแบบในอนาคต
+  orgDomain String? // เก็บโดเมนจากอีเมล เช่น "kmitl.ac.th"
+  studentId String? // เผื่อบางที่ต้องการ (ไม่ unique)
+
+  role          Role          @default(USER)
+  accountStatus AccountStatus @default(ACTIVE)
+  emailVerified DateTime?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // ความสัมพันธ์
+  listings       Listing[]      @relation("UserListings")
+  offersAsBuyer  Offer[]        @relation("OfferBuyer")
+  offersAsSeller Offer[]        @relation("OfferSeller")
+  notifications  Notification[]
+
+  // การรายงานผู้ใช้
+  reportsAuthored Report[] @relation("ReportAuthor")
+  reportsAgainst  Report[] @relation("ReportTarget")
+}
+
+model Listing {
+  id       String @id @default(cuid())
+  sellerId String
+  seller   User   @relation("UserListings", fields: [sellerId], references: [id])
+
+  title       String
+  description String
+  price       Int
+  condition   Condition @default(USED)
+
+  // ใช้ enum ListingStatus เพื่อรองรับ PENDING หลัง offer ถูก ACCEPT
+  status ListingStatus @default(ACTIVE)
+
+  imageUrls String[] @default([])
+  category  Category @default(OTHERS)
+
+  boostedUntil DateTime?
+  boostedAt    DateTime?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  offers       Offer[]
+  Notification Notification[]
+
+  @@index([status, createdAt])
+  @@index([sellerId])
+  @@index([category])
+  @@index([boostedUntil])
+}
+
+model Offer {
+  id String @id @default(cuid())
+
+  listingId String
+  listing   Listing @relation(fields: [listingId], references: [id], onDelete: Cascade)
+
+  buyerId String
+  buyer   User   @relation("OfferBuyer", fields: [buyerId], references: [id], onDelete: Cascade)
+
+  sellerId String
+  seller   User   @relation("OfferSeller", fields: [sellerId], references: [id], onDelete: Cascade)
+
+  status       OfferStatus @default(REQUESTED)
+  meetPlace    String
+  meetTime     DateTime
+  note         String?
+  rejectReason String?
+
+  lastActor OfferActor @default(BUYER)
+
+  qrToken     String?   @unique
+  qrScannedAt DateTime?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  Notification Notification[]
+
+  @@index([listingId])
+  @@index([buyerId])
+  @@index([sellerId])
+  @@index([status, updatedAt])
+}
+
+model Notification {
+  id String @id @default(cuid())
+
+  userId String
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  type NotificationType
+
+  offerId String?
+  offer   Offer?  @relation(fields: [offerId], references: [id], onDelete: SetNull)
+
+  listingId String?
+  listing   Listing? @relation(fields: [listingId], references: [id], onDelete: SetNull)
+
+  title   String
+  message String?
+
+  isRead    Boolean  @default(false)
+  createdAt DateTime @default(now())
+
+  @@index([userId, isRead, createdAt])
+  @@index([offerId])
+  @@index([listingId])
+}
+
+model Report {
+  id       String @id @default(cuid())
+  authorId String
+  author   User   @relation("ReportAuthor", fields: [authorId], references: [id], onDelete: Cascade)
+
+  targetUserId String
+  targetUser   User   @relation("ReportTarget", fields: [targetUserId], references: [id], onDelete: Cascade)
+
+  reason  String
+  details String?
+
+  createdAt DateTime @default(now())
+
+  @@index([authorId])
+  @@index([targetUserId, createdAt])
+}

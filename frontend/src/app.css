@@ -1,1 +1,69 @@
-@import 'tailwindcss';
+@import "tailwindcss";
+@import "flowbite";
+@source "../node_modules/flowbite-svelte-icons/dist";
+
+/* Theme: ขาว/ดำ/ส้ม */
+@theme {
+  --font-kanit: Kanit, system-ui, ui-sans-serif, sans-serif;
+
+  --color-brand-orange: #FF7A00;
+  --color-brand-orange2: #e66a00;
+  --color-brand-orange-hover: #cc5900;
+  --color-text-base: #333333;
+  --color-surface-light: #f5f5f5;
+  --color-surface-white: #ffffff;
+  --color-surface-border: #e0e0e0;
+
+  --shadow-card: 0 4px 8px rgba(0, 0, 0, 0.08);
+  --shadow-head: 0 2px 4px rgba(0, 0, 0, 0.05);
+}
+
+.line-clamp-2 {
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  overflow: hidden;
+}
+
+:root {
+  color-scheme: light;
+}
+
+html,
+body,
+#svelte {
+  height: 100%;
+}
+
+body {
+  @apply bg-surface-light text-text-base font-kanit;
+}
+
+/* helpers */
+.bg-brand {
+  background: var(--color-brand-orange);
+}
+
+.bg-brand-2 {
+  background: var(--color-brand-orange2);
+}
+
+.bg-brand:hover {
+  background: var(--color-brand-orange-hover);
+}
+
+.text-brand {
+  color: var(--color-brand-orange);
+}
+
+.border-surface {
+  border-color: var(--color-surface-border);
+}
+
+.shadow-card {
+  box-shadow: var(--shadow-card);
+}
+
+.shadow-head {
+  box-shadow: var(--shadow-head);
+}
