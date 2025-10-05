@@ -1,1 +1,0 @@
-# UI & Feature components ที่จะเอาไปใช้บ่อยๆ ช่วย clean code
