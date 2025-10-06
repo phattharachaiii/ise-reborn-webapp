@@ -1,0 +1,11 @@
+node_modules
+.next
+dist
+build
+.git
+Dockerfile
+Dockerfile.*
+npm-debug.log
+yarn.lock
+*.local
+.env

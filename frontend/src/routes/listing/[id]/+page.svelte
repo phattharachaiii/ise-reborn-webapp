@@ -7,7 +7,7 @@
 	import { onMount } from 'svelte';
 	import BuyRequestModal from '$lib/components/BuyRequestModal.svelte';
 	import QrBox from '$lib/components/QrBox.svelte';
-
+	import { ShareNodesSolid } from 'flowbite-svelte-icons';
 	const auth = authStore;
 
 	// ---------- Types ----------
@@ -40,32 +40,32 @@
 
 	// ---------- Labels ----------
 	const CAT_LABEL: Record<string, string> = {
-		BOOKS: 'หนังสือ',
-		CLOTHES: 'เสื้อผ้า',
-		GADGET: 'อุปกรณ์',
-		FURNITURE: 'เฟอร์นิเจอร์',
-		SPORTS: 'กีฬา',
-		STATIONERY: 'เครื่องเขียน',
-		ELECTRONICS: 'เครื่องใช้ไฟฟ้า',
-		VEHICLES: 'ยานพาหนะ',
-		MUSIC: 'ดนตรี',
-		OTHERS: 'อื่น ๆ'
+		BOOKS: 'Books',
+		CLOTHES: 'Clothes',
+		GADGET: 'Gadget',
+		FURNITURE: 'Furniture',
+		SPORTS: 'Sports',
+		STATIONERY: 'Stationery',
+		ELECTRONICS: 'Electronics',
+		VEHICLES: 'Vehicles',
+		MUSIC: 'Music',
+		OTHERS: 'Others'
 	};
 	const COND_LABEL: Record<string, string> = {
-		NEW: 'ใหม่',
-		LIKE_NEW: 'สภาพดีมาก',
-		USED: 'มือสอง'
+		NEW: 'New',
+		LIKE_NEW: 'Like New',
+		USED: 'Used'
 	};
 
-	// ถึงคิวผู้ขายก็ต่อเมื่อฝั่งล่าสุดที่กดคือ BUYER
+	// Seller's turn if last actor is BUYER
 	const myTurnSeller = (o: Offer) => o.lastActor === 'BUYER';
-	// ถึงคิวผู้ซื้อก็ต่อเมื่อฝั่งล่าสุดที่กดคือ SELLER
+	// Buyer's turn if last actor is SELLER
 	const myTurnBuyer = (o: Offer) => o.lastActor === 'SELLER';
 
 	const DEFAULT_IMG =
 		"data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='1000' height='1000' viewBox='0 0 1000 1000'><rect width='1000' height='1000' fill='%23eee'/><rect x='250' y='250' width='500' height='500' rx='24' ry='24' fill='%23d0d0d0'/><rect x='300' y='320' width='400' height='40' rx='8' ry='8' fill='%23c4c4c4'/><rect x='300' y='380' width='280' height='16' rx='6' ry='6' fill='%23cdcdcd'/></svg>";
 
-	// ---------- Img utils (ไม่บังคับ https บน localhost) ----------
+	// ---------- Img utils (no https required on localhost) ----------
 	function normalizeUrl(input?: string | null): string | null {
 		if (!input) return null;
 		try {
@@ -78,7 +78,7 @@
 				typeof window !== 'undefined' ? window.location.protocol === 'https:' : false;
 			const isCloudinary =
 				/(^|\.)cloudinary\.com$/.test(u.hostname) || /(^|\.)res\.cloudinary\.com$/.test(u.hostname);
-			// กัน mixed content เฉพาะกรณีหน้าเรา https และรูปเป็น Cloudinary เท่านั้น
+			// Prevent mixed content only if our page is https and image is from Cloudinary
 			if (u.protocol === 'http:' && isHttpsPage && isCloudinary) u.protocol = 'https:';
 			return u.toString();
 		} catch {
@@ -137,7 +137,7 @@
 	let offers: Offer[] = [];
 	let loadingOffers = false;
 	let offersError = '';
-	let offersLoadedFor: string | null = null; // ป้องกันโหลดซ้ำ
+	let offersLoadedFor: string | null = null; // Prevent duplicate loading
 
 	// toasts + modals (no browser alert)
 	type Toast = { id: number; text: string; type?: 'success' | 'error' | 'info' };
@@ -147,18 +147,18 @@
 		toasts = [...toasts, { id, text, type }];
 		setTimeout(() => (toasts = toasts.filter((t) => t.id !== id)), 2200);
 	}
-	function errText(e: any, fallback = 'ทำรายการไม่สำเร็จ') {
+	function errText(e: any, fallback = 'Action failed') {
 		const status = e?.status ?? e?.code;
 		const msg = String(e?.message ?? '').toUpperCase();
-		if (status === 401) return 'กรุณาเข้าสู่ระบบก่อน';
+		if (status === 401) return 'Please log in first';
 		if (status === 403) {
 			if (msg.includes('NOT_YOUR_TURN') || msg.includes('WAIT_FOR_BUYER'))
-				return 'รอผู้ซื้อดำเนินการก่อน';
-			if (msg.includes('WAIT_FOR_SELLER')) return 'รอผู้ขายดำเนินการก่อน';
-			if (msg.includes('FORBIDDEN')) return 'คุณไม่มีสิทธิ์ทำรายการนี้';
-			return 'ยังไม่ถึงคิวคุณดำเนินการ';
+				return 'Waiting for buyer to proceed';
+			if (msg.includes('WAIT_FOR_SELLER')) return 'Waiting for seller to proceed';
+			if (msg.includes('FORBIDDEN')) return 'You do not have permission for this action';
+			return 'It is not your turn to proceed';
 		}
-		if (msg.includes('OFFER_NOT_FOUND')) return 'ไม่พบคำขอนี้แล้ว';
+		if (msg.includes('OFFER_NOT_FOUND')) return 'Offer not found';
 		return fallback;
 	}
 
@@ -180,7 +180,7 @@
 	const isAdmin = () => $auth.user?.role === 'ADMIN';
 	const canBuy = () => listing && !isOwner() && listing.status === 'ACTIVE';
 
-	// ใช้รูปล่าสุดของผู้ขาย: ถ้าเจ้าของเพิ่งเปลี่ยนรูปใน session เดียว ให้ดึงจาก $auth ด้วย
+	// Use latest seller avatar: if owner just changed avatar in this session, use $auth
 	$: sellerAvatar = (() => {
 		if (listing?.seller?.id && $auth.user?.id === listing.seller.id) {
 			return safeUrl($auth.user?.avatarUrl || listing.seller?.avatarUrl || null);
@@ -205,7 +205,7 @@
 			fCategory = (listing.category as string) || 'OTHERS';
 			fDesc = listing.description;
 		} catch (e: any) {
-			errorMsg = e?.message || 'ไม่พบรายการ';
+			errorMsg = e?.message || 'Listing not found';
 		} finally {
 			loading = false;
 		}
@@ -218,7 +218,7 @@
 			const data = await apiJson<{ offers: Offer[] }>(`/api/listings/${listing.id}/offers`);
 			offers = data.offers;
 		} catch (e: any) {
-			offersError = e?.message || 'โหลดข้อเสนอไม่สำเร็จ';
+			offersError = e?.message || 'Failed to load offers';
 		} finally {
 			loadingOffers = false;
 		}
@@ -250,8 +250,8 @@
 	// ---------- Buyer flow ----------
 	function openBuy() {
 		if (!$auth.user) return openAuth('login');
-		if (isOwner()) return toast('คุณเป็นเจ้าของประกาศนี้', 'error');
-		if (listing?.status !== 'ACTIVE') return toast('ประกาศนี้ไม่ได้เปิดขาย', 'error');
+		if (isOwner()) return toast('You are the owner of this listing', 'error');
+		if (listing?.status !== 'ACTIVE') return toast('This listing is not for sale', 'error');
 		showBuyModal = true;
 	}
 
@@ -266,9 +266,9 @@
 				body: JSON.stringify({ status })
 			});
 			listing = data.listing;
-			toast('อัปเดตสถานะแล้ว', 'success');
+			toast('Status updated', 'success');
 		} catch (e: any) {
-			toast(e?.message || 'อัปเดตไม่สำเร็จ', 'error');
+			toast(e?.message || 'Update failed', 'error');
 		} finally {
 			working = false;
 		}
@@ -292,7 +292,7 @@
 		if (!$auth.user) return openAuth('login');
 		const priceNum = Number(fPrice);
 		if (!fTitle.trim() || !fDesc.trim() || !priceNum || priceNum <= 0) {
-			return toast('กรอกข้อมูลให้ครบ (ราคา > 0)', 'error');
+			return toast('Please fill all fields (price > 0)', 'error');
 		}
 		working = true;
 		try {
@@ -308,9 +308,9 @@
 			});
 			listing = data.listing;
 			edit = false;
-			toast('บันทึกแล้ว', 'success');
+			toast('Saved', 'success');
 		} catch (e: any) {
-			toast(e?.message || 'บันทึกไม่สำเร็จ', 'error');
+			toast(e?.message || 'Save failed', 'error');
 		} finally {
 			working = false;
 		}
@@ -322,10 +322,10 @@
 		working = true;
 		try {
 			await apiJson(`/api/listings/${listing.id}`, { method: 'DELETE' });
-			toast('ลบประกาศแล้ว', 'success');
+			toast('Listing deleted', 'success');
 			goto('/');
 		} catch (e: any) {
-			toast(e?.message || 'ลบไม่สำเร็จ', 'error');
+			toast(e?.message || 'Delete failed', 'error');
 		} finally {
 			working = false;
 			showDelete = false;
@@ -353,9 +353,9 @@
 				body: JSON.stringify({ action: 'ACCEPT' })
 			});
 			await loadOffers();
-			toast('ยอมรับคำขอแล้ว — สร้าง QR สำเร็จ', 'success');
+			toast('Offer accepted — QR created', 'success');
 		} catch (e: any) {
-			toast(errText(e, 'ทำรายการไม่สำเร็จ'), 'error');
+			toast(errText(e, 'Action failed'), 'error');
 		}
 	}
 
@@ -366,16 +366,16 @@
 				body: JSON.stringify({ action: 'REJECT', reason: rejectReason || '' })
 			});
 			await loadOffers();
-			toast('ปฏิเสธคำขอแล้ว', 'success');
+			toast('Offer rejected', 'success');
 			showReject = false;
 		} catch (e: any) {
-			toast(errText(e, 'ทำรายการไม่สำเร็จ'), 'error');
+			toast(errText(e, 'Action failed'), 'error');
 		}
 	}
 
 	async function reoffer() {
 		try {
-			if (!reMeetPlace || !reMeetTime) return toast('กรอกสถานที่และเวลาให้ครบ', 'error');
+			if (!reMeetPlace || !reMeetTime) return toast('Please fill meeting place and time', 'error');
 			await apiJson(`/api/offers/${actionOfferId}`, {
 				method: 'PATCH',
 				body: JSON.stringify({
@@ -385,10 +385,10 @@
 				})
 			});
 			await loadOffers();
-			toast('ส่งข้อเสนอใหม่แล้ว', 'success');
+			toast('New offer sent', 'success');
 			showReoffer = false;
 		} catch (e: any) {
-			toast(errText(e, 'ทำรายการไม่สำเร็จ'), 'error');
+			toast(errText(e, 'Action failed'), 'error');
 		}
 	}
 
@@ -434,378 +434,433 @@
 	// Share / Copy
 	async function shareListing() {
 		const url = typeof window !== 'undefined' ? window.location.href : '';
-		const text = listing?.title || 'สินค้า';
+		const text = listing?.title || 'Product';
 		try {
 			if ((navigator as any).share) {
 				await (navigator as any).share({ title: text, text, url });
 			} else {
 				await navigator.clipboard.writeText(url);
-				toast('คัดลอกลิงก์แล้ว', 'success');
+				toast('Link copied', 'success');
 			}
 		} catch {}
 	}
 </script>
 
-<section class="mx-auto px-4 py-6 max-w-6xl">
-	{#if loading}
-		<div class="grid md:grid-cols-2 gap-6">
-			<div class="aspect-square rounded-xl bg-surface-light animate-pulse" />
-			<div class="space-y-3">
-				<div class="h-8 w-2/3 rounded bg-surface-light animate-pulse" />
-				<div class="h-24 rounded bg-surface-light animate-pulse" />
-			</div>
-		</div>
-	{:else if !listing}
-		<div class="rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-700">
-			{errorMsg || 'ไม่พบรายการ'}
-		</div>
-	{:else}
-		<div class="grid md:grid-cols-2 gap-8">
-			<!-- Left: gallery -->
-			<div class="space-y-3">
-				<div class="relative group">
-					<img
-						src={coverThumb}
-						alt={listing.title}
-						class="w-full aspect-square object-cover rounded-xl border shadow-sm"
-						loading="lazy"
-						decoding="async"
-						sizes="(max-width: 768px) 100vw, 50vw"
-						on:error={onImgError}
-						on:click={openLightbox}
-						aria-label="ดูภาพขนาดใหญ่"
-					/>
-					<button
-						class="absolute right-2 bottom-2 rounded-md bg-black/50 text-white text-xs px-2 py-1 opacity-0 group-hover:opacity-100 transition"
-						on:click={openLightbox}>ดูภาพใหญ่</button
-					>
-				</div>
-
-				{#if listing.imageUrls?.length > 1}
-					<!-- มือถือ: สไลด์แนวนอน / เดสก์ท็อป: 4 คอลัมน์ -->
-					<div
-						class="md:grid md:grid-cols-4 md:gap-2 overflow-x-auto md:overflow-visible no-scrollbar -mx-1 px-1"
-					>
-						<div class="flex md:block gap-2 md:gap-0">
-							{#each listing.imageUrls as u, i (u)}
-								<button
-									type="button"
-									class={`rounded-lg border overflow-hidden cursor-pointer relative shrink-0 w-24 h-24 md:w-auto md:h-auto ${i === activeIdx ? 'ring-2 ring-orange-500' : 'hover:border-orange-300'}`}
-									on:click={() => {
-										activeIdx = i;
-										pick(i);
-									}}
-									aria-label={`ดูรูปที่ ${i + 1}`}
-								>
-									<img
-										src={toMini(u)}
-										data-orig={normalizeUrl(u) || ''}
-										alt="thumb"
-										class="w-24 h-24 md:w-full md:h-24 object-cover"
-										loading="lazy"
-										decoding="async"
-										on:error={onThumbError}
-									/>
-								</button>
-							{/each}
-						</div>
+<!-- UI/UX: Centered card frame, light tone, use existing theme classes -->
+<section class="min-h-screen flex items-center justify-center">
+	<div class="w-[1280px] px-4 md:py-8">
+		<div class="rounded-2xl border border-surface bg-white shadow-card p-4 md:p-6">
+			{#if loading}
+				<div class="grid md:grid-cols-2 gap-6">
+					<div class="aspect-square rounded-xl bg-surface-light animate-pulse"></div>
+					<div class="space-y-3">
+						<div class="h-8 w-2/3 rounded bg-surface-light animate-pulse"></div>
+						<div class="h-24 rounded bg-surface-light animate-pulse"></div>
 					</div>
-				{/if}
-			</div>
-
-			<!-- Right: details -->
-			<div class="bg-white rounded-xl border shadow p-4 md:p-6 relative">
-				<!-- Status chip at corner -->
-				<div class="absolute right-4 top-4">
-					<span
-						class="rounded-full border px-2.5 py-0.5 text-xs
-            {listing.status === 'ACTIVE' ? 'bg-green-50 text-green-700 border-green-200' : ''}
-            {listing.status === 'SOLD' ? 'bg-neutral-100 text-neutral-600 border-neutral-200' : ''}
-            {listing.status === 'HIDDEN' ? 'bg-yellow-50 text-yellow-700 border-yellow-200' : ''}"
-					>
-						{listing.status}
-					</span>
 				</div>
-
-				{#if !edit}
-					<!-- Title + chips -->
-					<div class="flex items-start gap-3 pr-16">
-						<h1 class="text-2xl md:text-3xl font-extrabold leading-tight">{listing.title}</h1>
-						<div class="ml-auto flex items-center gap-2">
-							{#if listing.category}
-								<span
-									class="inline-flex items-center rounded-full border px-3 py-1 text-xs bg-neutral-50 text-neutral-700"
-								>
-									{CAT_LABEL[listing.category] ?? listing.category}
-								</span>
-							{/if}
-						</div>
-					</div>
-
-					<!-- Price + share -->
-					<div class="mt-2 flex items-center gap-3">
-						<div class="text-2xl md:text-[28px] text-orange-600 font-extrabold">
-							฿ {Number(listing.price).toLocaleString()}
-						</div>
-						<div class="ml-auto flex items-center gap-2">
+			{:else if !listing}
+				<div class="rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-700">
+					{errorMsg || 'Listing not found'}
+				</div>
+			{:else}
+				<div class="grid gap-8 md:grid-cols-2">
+					<!-- Left: gallery -->
+					<div class="space-y-3">
+						<div class="relative group">
 							<button
-								class="rounded-lg border px-3 py-1.5 text-sm hover:bg-neutral-50"
-								on:click={shareListing}
-								aria-label="แชร์ประกาศ"
+								type="button"
+								class="w-full aspect-square object-cover rounded-xl border border-surface shadow-card p-0 m-0 focus:outline-none"
+								on:click={openLightbox}
+								aria-label="View large image"
+								tabindex="0"
+								style="background: none;"
 							>
-								แชร์
+								<img
+									src={coverThumb}
+									alt={listing.title}
+									class="w-full aspect-square object-cover rounded-xl"
+									loading="lazy"
+									decoding="async"
+									sizes="(max-width: 768px) 100vw, 50vw"
+									on:error={onImgError}
+									draggable="false"
+								/>
+							</button>
+							<button
+								class="absolute right-3 bottom-3 rounded-md bg-black/55 text-white text-xs px-2 py-1 opacity-0 group-hover:opacity-100 transition"
+								on:click={openLightbox}
+							>
+								View large image
 							</button>
 						</div>
-					</div>
 
-					<!-- Seller -->
-					<div class="rounded-xl border bg-neutral-50 p-3 mt-3 flex items-center gap-3">
-						{#if sellerAvatar}
-							<img
-								src={sellerAvatar}
-								alt={listing.seller?.name
-									? `รูปโปรไฟล์ของ ${listing.seller.name}`
-									: 'รูปโปรไฟล์ผู้ขาย'}
-								class="h-10 w-10 rounded-full object-cover border"
-								on:error={(e) => ((e.currentTarget as HTMLImageElement).style.display = 'none')}
-							/>
-						{:else}
+						{#if listing.imageUrls?.length > 1}
 							<div
-								class="h-10 w-10 rounded-full bg-orange-100 text-orange-700 grid place-items-center font-bold"
+								class="md:grid md:grid-cols-4 md:gap-2 overflow-x-auto md:overflow-visible no-scrollbar -mx-1 px-1"
 							>
-								{(listing.seller?.name || 'S').slice(0, 1).toUpperCase()}
+								<div class="flex md:block gap-2 md:gap-0">
+									{#each listing.imageUrls as u, i (u)}
+										<button
+											type="button"
+											class={`rounded-lg border border-surface overflow-hidden cursor-pointer relative shrink-0 w-24 h-24 md:w-auto md:h-auto ${i === activeIdx ? 'ring-2 ring-[var(--color-brand-orange)]' : 'hover:border-[var(--color-brand-orange)]/50'}`}
+											on:click={() => {
+												activeIdx = i;
+												pick(i);
+											}}
+											aria-label={`View image ${i + 1}`}
+										>
+											<img
+												src={toMini(u)}
+												data-orig={normalizeUrl(u) || ''}
+												alt="thumb"
+												class="w-24 h-24 md:w-full md:h-24 object-cover"
+												loading="lazy"
+												decoding="async"
+												on:error={onThumbError}
+											/>
+										</button>
+									{/each}
+								</div>
 							</div>
 						{/if}
-						<div class="leading-tight">
-							<div class="text-xs text-neutral-500">ผู้ขาย</div>
-							<div class="text-[15px] font-medium">{listing.seller?.name}</div>
-						</div>
 					</div>
 
-					<!-- quick facts -->
-					<div class="mt-4 grid grid-cols-2 gap-3 text-sm">
-						<div class="rounded-lg border p-3">
-							<div class="text-neutral-500">สภาพ</div>
-							<div class="font-medium">
-								{COND_LABEL[String(listing.condition)] ?? listing.condition}
-							</div>
-						</div>
-						<div class="rounded-lg border p-3">
-							<div class="text-neutral-500">หมวดหมู่</div>
-							<div class="font-medium">
-								{CAT_LABEL[listing.category ?? ''] ?? (listing.category || '—')}
-							</div>
-						</div>
-					</div>
-
-					<!-- Description -->
-					<div class="mt-4">
-						<div class="text-sm text-neutral-500 mb-1">รายละเอียด</div>
-						<div class="text-[15px] leading-relaxed whitespace-pre-line">{listing.description}</div>
-					</div>
-
-					{#if canBuy()}
-						<div class="sticky bottom-0 mt-5">
-							<button
-								class="w-full rounded-lg bg-orange-600 text-white py-2.5 font-semibold cursor-pointer hover:bg-orange-700 transition focus:outline-none focus-visible:ring-2 focus-visible:ring-orange-400"
-								on:click={openBuy}>ติดต่อ นัดซื้อ</button
+					<!-- Right: details -->
+					<div class="bg-white rounded-xl border border-surface shadow-card p-4 md:p-6 relative">
+						<!-- Status chip at corner -->
+						<div class="absolute right-4 ">
+							<span
+								class="rounded-full border px-2.5 py-0.5 text-xs
+									{listing.status === 'ACTIVE' ? 'bg-green-50 text-green-700 border-green-200' : ''}
+									{listing.status === 'SOLD' ? 'bg-neutral-100 text-neutral-600 border-neutral-200' : ''}
+									{listing.status === 'HIDDEN' ? 'bg-yellow-50 text-yellow-700 border-yellow-200' : ''}"
 							>
+								{listing.status}
+							</span>
 						</div>
-					{/if}
-				{:else}
-					<!-- Edit form -->
-					<div class="space-y-3">
-						<div>
-							<label class="block text-sm mb-1">ชื่อสินค้า</label>
-							<input class="w-full rounded border px-3 py-2" bind:value={fTitle} />
-						</div>
-						<div class="grid grid-cols-2 gap-3">
-							<div>
-								<label class="block text-sm mb-1">ราคา (บาท)</label>
-								<input class="w-full rounded border px-3 py-2" bind:value={fPrice} />
-							</div>
-							<div>
-								<label class="block text-sm mb-1">สภาพ</label>
-								<select class="w-full rounded border px-3 py-2" bind:value={fCondition}>
-									<option value="NEW">ใหม่</option>
-									<option value="USED">มือสอง</option>
-								</select>
-							</div>
-						</div>
-						<div>
-							<label class="block text-sm mb-1">หมวดหมู่</label>
-							<select class="w-full rounded border px-3 py-2" bind:value={fCategory}>
-								{#each Object.keys(CAT_LABEL) as c}
-									<option value={c}>{CAT_LABEL[c]}</option>
-								{/each}
-							</select>
-						</div>
-						<div>
-							<label class="block text-sm mb-1">รายละเอียด</label>
-							<textarea class="w-full rounded border px-3 py-2" rows="5" bind:value={fDesc} />
-						</div>
-						<div class="flex flex-wrap gap-2 pt-2">
-							<button
-								class="rounded px-4 py-2 bg-brand text-white disabled:opacity-60"
-								on:click={saveEdit}
-								disabled={working}>บันทึก</button
-							>
-							<button class="rounded px-4 py-2 border" on:click={cancelEdit} disabled={working}
-								>ยกเลิก</button
-							>
-						</div>
-					</div>
-				{/if}
 
-				{#if (isOwner() || isAdmin()) && !edit}
-					<div class="mt-5 grid grid-cols-2 gap-2">
-						<button
-							class="rounded px-3 py-2 border cursor-pointer disabled:opacity-60"
-							on:click={() => markStatus('SOLD')}
-							disabled={working || listing.status === 'SOLD'}
-						>
-							ทำเครื่องหมาย: ขายแล้ว
-						</button>
-						<button
-							class="rounded px-3 py-2 border cursor-pointer disabled:opacity-60"
-							on:click={() => markStatus('HIDDEN')}
-							disabled={working || listing.status === 'HIDDEN'}
-						>
-							ซ่อน
-						</button>
-						<button
-							class="rounded px-3 py-2 border cursor-pointer disabled:opacity-60"
-							on:click={() => markStatus('ACTIVE')}
-							disabled={working || listing.status === 'ACTIVE'}
-						>
-							เปิดขาย
-						</button>
-						<button
-							class="rounded px-3 py-2 border text-red-600 cursor-pointer disabled:opacity-60"
-							on:click={() => (showDelete = true)}
-							disabled={working}
-						>
-							ลบประกาศ
-						</button>
-					</div>
-					<div class="mt-3">
-						<button class="rounded px-3 py-2 border w-full" on:click={enterEdit}
-							>แก้ไขรายละเอียดทั้งหมด</button
-						>
-					</div>
-				{/if}
-			</div>
-		</div>
-
-		<!-- Offers (owner) -->
-		{#if isOwner() && listing}
-			<div class="mt-8">
-				<h2 class="text-lg font-bold mb-2">คำขอซื้อที่เข้ามา</h2>
-
-				{#if loadingOffers}
-					<div class="rounded border bg-surface-light p-3 text-sm">กำลังโหลด…</div>
-				{:else if offersError}
-					<div class="rounded border border-red-200 bg-red-50 p-3 text-sm text-red-700">
-						{offersError}
-					</div>
-				{:else if offers.length === 0}
-					<div class="rounded border bg-surface-light p-3 text-sm">ยังไม่มีคำขอซื้อ</div>
-				{:else}
-					<div class="space-y-3">
-						{#each offers as o (o.id)}
-							<div class="rounded-lg border p-3 flex gap-3 sm:flex-row flex-col">
-								<!-- ส่วนข้อมูลหลัก -->
-								<div class="flex flex-col gap-1">
-									<div class="text-sm">
-										<span class="font-semibold">{o.buyer?.name || 'ผู้ซื้อ'}</span>
-										<span class="ml-2 text-[12px] rounded-full border px-2 py-0.5">{o.status}</span>
-									</div>
-									<div class="text-[13px] text-neutral-600">
-										นัดรับ:
-										<span class="font-medium">{o.meetPlace}</span>
-										@ <span class="font-medium">{formatDT(o.meetTime)}</span>
-									</div>
-									{#if o.note}
-										<div class="text-[12px] text-neutral-500">โน้ตจากผู้ซื้อ: {o.note}</div>
-									{/if}
-									{#if o.rejectReason}
-										<div class="text-[12px] text-red-600">เหตุผลปฏิเสธ: {o.rejectReason}</div>
+						{#if !edit}
+							<!-- Title + chips -->
+							<div class="flex items-start gap-3 pr-16">
+								<h1 class="text-3xl md:text-4xl font-extrabold leading-tight">{listing.title}</h1>
+								<div class="ml-auto flex items-center gap-2">
+									{#if listing.category}
+										<span
+											class="inline-flex items-center rounded-full border border-surface px-3 py-1 text-xs bg-neutral-50 text-neutral-700"
+										>
+											{CAT_LABEL[listing.category] ?? listing.category}
+										</span>
 									{/if}
 								</div>
+							</div>
 
-								<!-- ปุ่มกระทำ -->
-								{#if o.status === 'REQUESTED' || o.status === 'REOFFER'}
-									<div class="flex flex-col md:flex-row md:items-center gap-2 md:gap-3 w-full">
-										{#if myTurnSeller(o)}
-											<div class="flex flex-col sm:flex-row gap-2 w-full md:w-auto">
-												<button
-													class="w-full sm:w-auto rounded px-3 py-2 border"
-													on:click={() => openReoffer(o.id)}>เสนอใหม่</button
-												>
-												<button
-													class="w-full sm:w-auto rounded px-3 py-2 border text-red-600"
-													on:click={() => openReject(o.id)}>ปฏิเสธ</button
-												>
-												<button
-													class="w-full sm:w-auto rounded px-3 py-2 bg-brand text-white"
-													on:click={() => acceptOffer(o.id)}>ยอมรับ</button
+							<!-- Price + share -->
+							<div class="mt-2 flex items-center gap-3">
+								<div class="text-[28px] md:text-[32px] text-brand font-extrabold">
+									฿ {Number(listing.price).toLocaleString()}
+								</div>
+								<div class="ml-auto flex items-center gap-2">
+									<button
+										class="cursor-pointer rounded-lg border border-surface px-3 py-1.5 text-sm hover:bg-neutral-50"
+										on:click={shareListing}
+										aria-label="Share listing"
+									>
+										<ShareNodesSolid class="w-4 h-4 mr-1" />
+									</button>
+								</div>
+							</div>
+
+							<!-- Seller -->
+							<div
+								class="rounded-xl border border-surface bg-neutral-50 p-3 mt-3 flex items-center gap-3"
+							>
+								{#if sellerAvatar}
+									<img
+										src={sellerAvatar}
+										alt={listing.seller?.name
+											? `Profile picture of ${listing.seller.name}`
+											: 'Seller profile picture'}
+										class="h-10 w-10 rounded-full object-cover border"
+										on:error={(e) => ((e.currentTarget as HTMLImageElement).style.display = 'none')}
+									/>
+								{:else}
+									<div
+										class="h-10 w-10 rounded-full bg-orange-100 text-brand grid place-items-center font-bold"
+									>
+										{(listing.seller?.name || 'S').slice(0, 1).toUpperCase()}
+									</div>
+								{/if}
+								<div class="leading-tight">
+									<div class="text-xs text-neutral-500">Seller</div>
+									<div class="text-[15px] font-medium">{listing.seller?.name}</div>
+								</div>
+							</div>
+
+							<!-- quick facts -->
+							<div class="mt-4 grid grid-cols-2 gap-3 text-sm">
+								<div class="rounded-lg border border-surface p-3">
+									<div class="text-neutral-500">Condition</div>
+									<div class="font-medium">
+										{COND_LABEL[String(listing.condition)] ?? listing.condition}
+									</div>
+								</div>
+								<div class="rounded-lg border border-surface p-3">
+									<div class="text-neutral-500">Category</div>
+									<div class="font-medium">
+										{CAT_LABEL[listing.category ?? ''] ?? (listing.category || '—')}
+									</div>
+								</div>
+							</div>
+
+							<!-- Description -->
+							<div class="mt-4">
+								<div class="text-sm text-neutral-500 mb-1">Description</div>
+								<div class="text-[15px] leading-relaxed whitespace-pre-line">
+									{listing.description}
+								</div>
+							</div>
+
+							{#if canBuy()}
+								<div class="sticky bottom-0 mt-5">
+									<button
+										class="w-full rounded-lg bg-brand text-white py-2.5 font-semibold cursor-pointer hover:bg-brand-2 transition focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-brand-orange)]/40"
+										on:click={openBuy}>Contact / Buy</button
+									>
+								</div>
+							{/if}
+						{:else}
+							<!-- Edit form -->
+							<div class="space-y-3">
+								<div>
+									<label for="product-name" class="block text-sm mb-1">Product name</label>
+									<input
+										id="product-name"
+										class="w-full rounded border border-surface px-3 py-2"
+										bind:value={fTitle}
+									/>
+								</div>
+								<div class="grid grid-cols-2 gap-3">
+									<div>
+										<label for="product-price" class="block text-sm mb-1">Price (Baht)</label>
+										<input
+											id="product-price"
+											class="w-full rounded border border-surface px-3 py-2"
+											bind:value={fPrice}
+										/>
+									</div>
+									<div>
+										<label for="product-condition" class="block text-sm mb-1">Condition</label>
+										<select
+											id="product-condition"
+											class="w-full rounded border border-surface px-3 py-2"
+											bind:value={fCondition}
+										>
+											<option value="NEW">New</option>
+											<option value="USED">Used</option>
+										</select>
+									</div>
+								</div>
+								<div>
+									<label for="product-category" class="block text-sm mb-1">Category</label>
+									<select
+										id="product-category"
+										class="w-full rounded border border-surface px-3 py-2"
+										bind:value={fCategory}
+									>
+										{#each Object.keys(CAT_LABEL) as c}
+											<option value={c}>{CAT_LABEL[c]}</option>
+										{/each}
+									</select>
+								</div>
+								<div>
+									<label for="product-description" class="block text-sm mb-1">Description</label>
+									<textarea
+										id="product-description"
+										class="w-full rounded border border-surface px-3 py-2"
+										rows="5"
+										bind:value={fDesc}
+									></textarea>
+								</div>
+								<div class="flex flex-wrap gap-2 pt-2">
+									<button
+										class="rounded px-4 py-2 bg-brand text-white hover:bg-brand-2 transition disabled:opacity-60"
+										on:click={saveEdit}
+										disabled={working}>Save</button
+									>
+									<button
+										class="rounded px-4 py-2 border border-surface hover:bg-neutral-50"
+										on:click={cancelEdit}
+										disabled={working}>Cancel</button
+									>
+								</div>
+							</div>
+						{/if}
+
+						{#if (isOwner() || isAdmin()) && !edit}
+							<div class="mt-5 grid grid-cols-2 gap-2">
+								<button
+									class="rounded px-3 py-2 border border-surface hover:bg-neutral-50 cursor-pointer disabled:opacity-60"
+									on:click={() => markStatus('SOLD')}
+									disabled={working || listing.status === 'SOLD'}
+								>
+									Mark as Sold
+								</button>
+								<button
+									class="rounded px-3 py-2 border border-surface hover:bg-neutral-50 cursor-pointer disabled:opacity-60"
+									on:click={() => markStatus('HIDDEN')}
+									disabled={working || listing.status === 'HIDDEN'}
+								>
+									Hide
+								</button>
+								<button
+									class="rounded px-3 py-2 border border-surface hover:bg-neutral-50 cursor-pointer disabled:opacity-60"
+									on:click={() => markStatus('ACTIVE')}
+									disabled={working || listing.status === 'ACTIVE'}
+								>
+									Activate
+								</button>
+								<button
+									class="rounded px-3 py-2 border border-red-200 text-red-600 hover:bg-red-50 cursor-pointer disabled:opacity-60"
+									on:click={() => (showDelete = true)}
+									disabled={working}
+								>
+									Delete Listing
+								</button>
+							</div>
+							<div class="mt-3">
+								<button
+									class="cursor-pointer rounded px-3 py-2 border border-surface w-full hover:bg-neutral-50"
+									on:click={enterEdit}>Edit all details</button
+								>
+							</div>
+						{/if}
+					</div>
+				</div>
+
+				<!-- Offers (owner) -->
+				{#if isOwner() && listing}
+					<div class="mt-8">
+						<h2 class="text-lg font-bold mb-2">Incoming Purchase Requests</h2>
+
+						{#if loadingOffers}
+							<div class="rounded border border-surface bg-surface-light p-3 text-sm">
+								Loading…
+							</div>
+						{:else if offersError}
+							<div class="rounded border border-red-200 bg-red-50 p-3 text-sm text-red-700">
+								{offersError}
+							</div>
+						{:else if offers.length === 0}
+							<div class="rounded border border-surface bg-surface-light p-3 text-sm">
+								No purchase requests yet
+							</div>
+						{:else}
+							<div class="space-y-3">
+								{#each offers as o (o.id)}
+									<div class="rounded-lg border border-surface p-3 flex gap-3 sm:flex-row flex-col">
+										<!-- Main info -->
+										<div class="flex flex-col gap-1">
+											<div class="text-sm">
+												<span class="font-semibold">{o.buyer?.name || 'Buyer'}</span>
+												<span class="ml-2 text-[12px] rounded-full border px-2 py-0.5"
+													>{o.status}</span
 												>
 											</div>
-											<div class="text-[12px] text-neutral-500 md:ml-2">
-												{#if o.status === 'REQUESTED'}ถึงคิวคุณตอบรับคำขอนี้{/if}
-												{#if o.status === 'REOFFER'}คู่สนทนาเสนอวัน–เวลาใหม่{/if}
+											<div class="text-[13px] text-neutral-600">
+												Meet at:
+												<span class="font-medium">{o.meetPlace}</span>
+												@ <span class="font-medium">{formatDT(o.meetTime)}</span>
 											</div>
-										{:else}
-											<div class="text-[12px] text-neutral-500">รอผู้ซื้อดำเนินการ…</div>
+											{#if o.note}
+												<div class="text-[12px] text-neutral-500">Note from buyer: {o.note}</div>
+											{/if}
+											{#if o.rejectReason}
+												<div class="text-[12px] text-red-600">Rejection reason: {o.rejectReason}</div>
+											{/if}
+										</div>
+
+										<!-- Actions -->
+										{#if o.status === 'REQUESTED' || o.status === 'REOFFER'}
+											<div class="flex flex-col md:flex-row md:items-center gap-2 md:gap-3 w-full">
+												{#if myTurnSeller(o)}
+													<div class="flex flex-col sm:flex-row gap-2 w-full md:w-auto">
+														<button
+															class="cursor-pointer w-full sm:w-auto rounded px-3 py-2 border border-surface hover:bg-neutral-50"
+															on:click={() => openReoffer(o.id)}>Counter offer</button
+														>
+														<button
+															class="cursor-pointer w-full sm:w-auto rounded px-3 py-2 border border-red-200 text-red-600 hover:bg-red-50"
+															on:click={() => openReject(o.id)}>Reject</button
+														>
+														<button
+															class="cursor-pointer w-full sm:w-auto rounded px-3 py-2 bg-brand text-white hover:bg-brand-2"
+															on:click={() => acceptOffer(o.id)}>Accept</button
+														>
+													</div>
+													<div class="text-[12px] text-neutral-500 md:ml-2">
+														{#if o.status === 'REQUESTED'}Your turn to respond to this request{/if}
+														{#if o.status === 'REOFFER'}The other party proposed a new date/time{/if}
+													</div>
+												{:else}
+													<div class="text-[12px] text-neutral-500">Waiting for buyer to proceed…</div>
+												{/if}
+											</div>
+										{/if}
+
+										<!-- Other statuses -->
+										{#if o.status === 'ACCEPTED'}
+											<div class="text-[12px] text-green-700">
+												Accepted — waiting for buyer to scan QR on meeting day
+											</div>
+										{:else if o.status === 'COMPLETED'}
+											<div class="text-[12px] text-green-700">Deal completed</div>
+										{:else if o.status === 'REJECTED'}
+											<div class="text-[12px] text-neutral-500">Rejected</div>
+										{/if}
+
+										<!-- QR -->
+										{#if o.status === 'ACCEPTED'}
+											<div class="mt-1 w-full">
+												<div class="text-[12px] text-green-700 mb-1 md:text-right">
+													Show this QR to the buyer
+												</div>
+												<div class="w-full md:flex md:justify-end">
+													<div class="w-full sm:w-auto">
+														<QrBox tokenUrl={`reborn://offer/${o.id}?t=${o.qrToken}`} />
+													</div>
+												</div>
+											</div>
 										{/if}
 									</div>
-								{/if}
-
-								<!-- สถานะอื่น ๆ -->
-								{#if o.status === 'ACCEPTED'}
-									<div class="text-[12px] text-green-700">
-										ยอมรับแล้ว — รอผู้ซื้อสแกน QR ในวันนัด
-									</div>
-								{:else if o.status === 'COMPLETED'}
-									<div class="text-[12px] text-green-700">จบดีลแล้ว</div>
-								{:else if o.status === 'REJECTED'}
-									<div class="text-[12px] text-neutral-500">ปฏิเสธแล้ว</div>
-								{/if}
-
-								<!-- QR -->
-								{#if o.status === 'ACCEPTED'}
-									<div class="mt-1 w-full">
-										<div class="text-[12px] text-green-700 mb-1 md:text-right">
-											แสดง QR ให้ผู้ซื้อสแกน
-										</div>
-										<div class="w-full md:flex md:justify-end">
-											<div class="w-full sm:w-auto">
-												<QrBox tokenUrl={`reborn://offer/${o.id}?t=${o.qrToken}`} />
-											</div>
-										</div>
-									</div>
-								{/if}
+								{/each}
 							</div>
-						{/each}
+						{/if}
 					</div>
 				{/if}
-			</div>
-		{/if}
-	{/if}
+			{/if}
+		</div>
+	</div>
 </section>
 
 <!-- Lightbox -->
 {#if showLightbox}
 	<div
 		class="fixed inset-0 z-[100] bg-black/80 grid place-items-center p-4"
-		on:click={closeLightbox}
 		role="dialog"
 		aria-modal="true"
 	>
+		<button
+			class="absolute right-4 top-4 text-white/80 hover:text-white text-2xl font-bold transition-transform hover:scale-110"
+			on:click={closeLightbox}
+			aria-label="Close large image"
+		>
+			✕
+		</button>
+
 		<img
 			src={coverOriginal || coverThumb}
-			alt="ภาพสินค้า"
-			class="max-h-[90vh] max-w-[90vw] object-contain rounded-lg shadow-2xl"
+			alt="Product"
+			class="h-screen w-screen object-contain bg-black"
 		/>
 	</div>
 {/if}
@@ -817,7 +872,7 @@
 	onClose={() => (showBuyModal = false)}
 	on:created={() => {
 		showBuyModal = false;
-		toast('ส่งคำขอซื้อแล้ว', 'success');
+		toast('Purchase request sent', 'success');
 	}}
 />
 
@@ -826,19 +881,20 @@
 	<div class="fixed inset-0 z-[90] bg-black/30 overflow-y-auto">
 		<div class="min-h-full flex items-center justify-center p-4">
 			<div
-				class="w-[min(90vw,420px)] rounded-xl bg-white p-4 border shadow-card
-                  max-h-[90vh] overflow-y-auto"
+				class="w-[min(90vw,420px)] rounded-xl bg-white p-4 border border-surface shadow-card
+				  max-h-[90vh] overflow-y-auto"
 			>
-				<div class="text-lg font-semibold mb-2">ลบประกาศนี้?</div>
-				<p class="text-sm text-neutral-600">การลบไม่สามารถย้อนกลับได้</p>
+				<div class="text-lg font-semibold mb-2">Delete this listing?</div>
+				<p class="text-sm text-neutral-600">This action cannot be undone</p>
 				<div class="mt-4 flex justify-end gap-2">
-					<button class="rounded px-3 py-2 border" on:click={() => (showDelete = false)}
-						>ยกเลิก</button
+					<button
+						class="rounded px-3 py-2 border border-surface hover:bg-neutral-50"
+						on:click={() => (showDelete = false)}>Cancel</button
 					>
 					<button
-						class="rounded px-3 py-2 bg-red-600 text-white"
+						class="rounded px-3 py-2 bg-red-600 text-white hover:bg-red-700"
 						on:click={doRemove}
-						disabled={working}>ลบ</button
+						disabled={working}>Delete</button
 					>
 				</div>
 			</div>
@@ -850,18 +906,25 @@
 	<div class="fixed inset-0 z-[90] bg-black/30 overflow-y-auto">
 		<div class="min-h-full flex items-center justify-center p-4">
 			<div
-				class="w-[min(90vw,480px)] rounded-xl bg-white p-4 border shadow-card
-                  max-h-[90vh] overflow-y-auto"
+				class="w-[min(90vw,480px)] rounded-xl bg-white p-4 border border-surface shadow-card
+				  max-h-[90vh] overflow-y-auto"
 			>
-				<div class="text-lg font-semibold mb-2">ปฏิเสธคำขอซื้อ</div>
-				<label class="block text-sm mb-1">เหตุผล (ไม่บังคับ)</label>
-				<textarea rows="4" class="w-full rounded border px-3 py-2" bind:value={rejectReason} />
+				<div class="text-lg font-semibold mb-2">Reject purchase request</div>
+				<label for="reject-reason" class="block text-sm mb-1">Reason (optional)</label>
+				<textarea
+					id="reject-reason"
+					rows="4"
+					class="w-full rounded border border-surface px-3 py-2"
+					bind:value={rejectReason}
+				></textarea>
 				<div class="mt-4 flex justify-end gap-2">
-					<button class="rounded px-3 py-2 border" on:click={() => (showReject = false)}
-						>ยกเลิก</button
+					<button
+						class="rounded px-3 py-2 border border-surface hover:bg-neutral-50"
+						on:click={() => (showReject = false)}>Cancel</button
 					>
-					<button class="rounded px-3 py-2 bg-brand text-white" on:click={rejectOffer}
-						>ยืนยัน</button
+					<button
+						class="rounded px-3 py-2 bg-brand text-white hover:bg-brand-2"
+						on:click={rejectOffer}>Confirm</button
 					>
 				</div>
 			</div>
@@ -873,30 +936,36 @@
 	<div class="fixed inset-0 z-[90] bg-black/30 overflow-y-auto">
 		<div class="min-h-full flex items-center justify-center p-4">
 			<div
-				class="w-[min(90vw,520px)] rounded-xl bg-white p-4 border shadow-card
-                  max-h-[90vh] overflow-y-auto"
+				class="w-[min(90vw,520px)] rounded-xl bg-white p-4 border border-surface shadow-card
+				  max-h-[90vh] overflow-y-auto"
 			>
-				<div class="text-lg font-semibold mb-2">เสนอวัน–สถานที่ใหม่</div>
+				<div class="text-lg font-semibold mb-2">Propose new date/place</div>
 				<div class="grid md:grid-cols-2 gap-3">
 					<div>
-						<label class="block text-sm mb-1">สถานที่นัด</label>
-						<input class="w-full rounded border px-3 py-2" bind:value={reMeetPlace} />
+						<label for="re-meet-place" class="block text-sm mb-1">Meeting place</label>
+						<input
+							id="re-meet-place"
+							class="w-full rounded border border-surface px-3 py-2"
+							bind:value={reMeetPlace}
+						/>
 					</div>
 					<div>
-						<label class="block text-sm mb-1">เวลานัด</label>
+						<label for="re-meet-time" class="block text-sm mb-1">Meeting time</label>
 						<input
+							id="re-meet-time"
 							type="datetime-local"
-							class="w-full rounded border px-3 py-2"
+							class="w-full rounded border border-surface px-3 py-2"
 							bind:value={reMeetTime}
 						/>
 					</div>
 				</div>
 				<div class="mt-4 flex justify-end gap-2">
-					<button class="rounded px-3 py-2 border" on:click={() => (showReoffer = false)}
-						>ยกเลิก</button
+					<button
+						class="rounded px-3 py-2 border border-surface hover:bg-neutral-50"
+						on:click={() => (showReoffer = false)}>Cancel</button
 					>
-					<button class="rounded px-3 py-2 bg-brand text-white" on:click={reoffer}
-						>ส่งข้อเสนอใหม่</button
+					<button class="rounded px-3 py-2 bg-brand text-white hover:bg-brand-2" on:click={reoffer}
+						>Send new offer</button
 					>
 				</div>
 			</div>
@@ -906,14 +975,16 @@
 
 <!-- Sticky CTA (mobile only) -->
 {#if listing && canBuy()}
-	<div class="md:hidden fixed bottom-0 inset-x-0 z-[80] bg-white/95 backdrop-blur border-t p-3">
+	<div
+		class="md:hidden fixed bottom-0 inset-x-0 z-[80] bg-white/95 backdrop-blur border-t border-surface p-3"
+	>
 		<div class="max-w-6xl mx-auto flex items-center gap-3">
-			<div class="font-extrabold text-orange-600">
+			<div class="font-extrabold text-brand">
 				฿ {Number(listing?.price || 0).toLocaleString()}
 			</div>
 			<button
-				class="ml-auto rounded-lg bg-orange-600 text-white px-4 py-2 font-semibold hover:bg-orange-700"
-				on:click={openBuy}>ติดต่อ นัดซื้อ</button
+				class="ml-auto rounded-lg bg-brand text-white px-4 py-2 font-semibold hover:bg-brand-2"
+				on:click={openBuy}>Contact / Buy</button
 			>
 		</div>
 	</div>
@@ -923,10 +994,10 @@
 <div class="fixed bottom-4 left-1/2 -translate-x-1/2 z-[95] space-y-2">
 	{#each toasts as t (t.id)}
 		<div
-			class="px-3 py-2 rounded-lg shadow-card border text-sm
-      {t.type === 'success' ? 'bg-green-50 border-green-200 text-green-800' : ''}
-      {t.type === 'error' ? 'bg-red-50 border-red-200 text-red-700' : ''}
-      {t.type === 'info' ? 'bg-white border-surface text-neutral-700' : ''}"
+			class="px-3 py-2 rounded-lg shadow-card border border-surface text-sm
+	  {t.type === 'success' ? 'bg-green-50 border-green-200 text-green-800' : ''}
+	  {t.type === 'error' ? 'bg-red-50 border-red-200 text-red-700' : ''}
+	  {t.type === 'info' ? 'bg-white text-neutral-700' : ''}"
 		>
 			{t.text}
 		</div>
@@ -934,7 +1005,7 @@
 </div>
 
 <style>
-	/* ซ่อนแถบสกรอลล์แนวนอนของ thumbs บนมือถือ (optional) */
+	/* Hide horizontal scrollbar for thumbs on mobile (optional) */
 	.no-scrollbar::-webkit-scrollbar {
 		display: none;
 	}

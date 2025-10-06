@@ -9,17 +9,17 @@
 	const ACCEPTED_TYPES = ['image/jpeg', 'image/png', 'image/webp'];
 	const MAX_IMAGE_BYTES = 2 * 1024 * 1024;
 
-	// ให้ตรงกับ Prisma enum: Condition { NEW, USED }
+	// Match Prisma enum: Condition { NEW, USED }
 	const CONDITIONS = [
-		{ value: 'NEW', label: 'ใหม่' },
-		{ value: 'USED', label: 'มือสอง' }
+		{ value: 'NEW', label: 'New' },
+		{ value: 'USED', label: 'Used' }
 	] as const;
 
 	let title = '';
 	let category = '';
 	let priceText = '0';
 	let description = '';
-	// ถ้ายังไม่เพิ่มใน DB/Backend ให้คอมเมนต์ไว้ก่อน
+	// If not added in DB/Backend, comment out for now
 	// let meetPoint = '';
 	type ConditionEnum = 'NEW' | 'USED';
 	let condition: ConditionEnum = 'USED';
@@ -31,8 +31,8 @@
 	let errorMsg = '';
 
 	function validateFile(f: File) {
-		if (!ACCEPTED_TYPES.includes(f.type)) return 'ชนิดไฟล์ไม่รองรับ';
-		if (f.size > MAX_IMAGE_BYTES) return 'ไฟล์ใหญ่เกินกำหนด';
+		if (!ACCEPTED_TYPES.includes(f.type)) return 'Unsupported file type';
+		if (f.size > MAX_IMAGE_BYTES) return 'File size exceeds the limit';
 	}
 
 	function choose(e: Event) {
@@ -64,16 +64,16 @@
 	});
 
 	/**
-	 * อัปโหลดรูปแบบ Minimal Sign:
-	 * - ขอ params จาก /api/images/sign (timestamp/signature/apiKey/cloudName)
-	 * - ส่งเฉพาะ key ที่ Cloudinary ใช้เซ็นจริง: file, api_key, timestamp, signature
-	 * - ห้ามใส่ folder/public_id/upload_preset ระหว่างแก้ Invalid Signature
+	 * Minimal Sign image upload:
+	 * - Request params from /api/images/sign (timestamp/signature/apiKey/cloudName)
+	 * - Send only keys used by Cloudinary for signing: file, api_key, timestamp, signature
+	 * - Do not add folder/public_id/upload_preset until signature is shared on both server/client
 	 */
 	async function uploadImages(): Promise<string[]> {
 		const valid = files.filter((x) => !x.error);
 		if (valid.length === 0) return [];
 
-		// ขอ signature จาก backend (Minimal Sign: timestamp only)
+		// Request signature from backend (Minimal Sign: timestamp only)
 		const sig = await apiJson<{
 			cloudName: string;
 			apiKey: string;
@@ -89,14 +89,13 @@
 			form.append('api_key', sig.apiKey);
 			form.append('timestamp', String(sig.timestamp));
 			form.append('signature', sig.signature);
-			// ❌ งดเพิ่มคีย์อื่น ๆ จนกว่าจะเซ็นร่วมกันทั้งสองฝั่ง (server/client)
 
 			const r = await fetch(`https://api.cloudinary.com/v1_1/${sig.cloudName}/image/upload`, {
 				method: 'POST',
 				body: form
 			});
 			const j = await r.json();
-			if (!r.ok) throw new Error(j?.error?.message || 'upload failed');
+			if (!r.ok) throw new Error(j?.error?.message || 'Upload failed');
 			urls.push(j.secure_url);
 		}
 		return urls;
@@ -105,23 +104,23 @@
 	async function submit() {
 		errorMsg = '';
 
-		// 1) validate ฟอร์ม
+		// 1) Validate form
 		const price = Number(priceText) || 0;
 		if (!title.trim() || !category || price <= 0) {
-			errorMsg = 'กรอกชื่อสินค้า / หมวดหมู่ / ราคา ให้ครบ';
+			errorMsg = 'Please fill in product name, category, and price.';
 			return;
 		}
 		if (files.some((x) => x.error)) {
-			errorMsg = 'มีไฟล์รูปที่ไม่ผ่านเงื่อนไข โปรดลบ/แก้ไขก่อน';
+			errorMsg = 'Some images do not meet the requirements. Please remove or fix them.';
 			return;
 		}
 
-		// 2) อัปโหลดรูป
+		// 2) Upload images
 		creating = true;
 		try {
 			const images = await uploadImages();
 
-			// 3) สร้างประกาศ
+			// 3) Create listing
 			const res = await api('/api/listings', {
 				method: 'POST',
 				body: JSON.stringify({
@@ -129,23 +128,23 @@
 					description: description.trim(),
 					price,
 					condition, // 'NEW' | 'USED'
-					images, // array ของ Cloudinary URLs
-					category // ต้องเป็นหนึ่งใน enum Category ของ Prisma
+					images, // array of Cloudinary URLs
+					category // Must be one of Prisma enum Category
 				})
 			});
 
 			if (res.status === 401) {
-				// ยังไม่ล็อกอิน
+				// Not logged in
 				openAuth('login');
 				return;
 			}
 
 			const data = await res.json();
-			if (!res.ok) throw new Error(data.message || 'สร้างไม่สำเร็จ');
+			if (!res.ok) throw new Error(data.message || 'Failed to create listing');
 
 			location.href = `/listing/${data.listing.id}`;
 		} catch (e: any) {
-			errorMsg = e?.message || 'เกิดข้อผิดพลาด';
+			errorMsg = e?.message || 'An error occurred';
 		} finally {
 			creating = false;
 		}
@@ -155,22 +154,24 @@
 <section class="mx-auto max-w-4xl px-4 py-8">
 	<div class="rounded-2xl border bg-white shadow p-6 md:p-8">
 		<h1 class="text-center text-2xl md:text-3xl font-extrabold text-brand mb-6">
-			ลงขายสินค้าของคุณ
+			Sell Your Product
 		</h1>
 
 		<div class="grid grid-cols-1 md:grid-cols-2 gap-6">
-			<!-- อัปโหลดรูป (ซ้าย) -->
+			<!-- Image upload (left) -->
 			<div>
-				<label class="block text-sm font-medium mb-2">รูปภาพสินค้า (รูปแรกจะเป็นรูปปก)</label>
+				<label class="block text-sm font-medium mb-2" for="product-images">
+					Product Images (the first image will be the cover)
+				</label>
 
 				<label
 					class="block aspect-[4/3] rounded-xl border-2 border-dashed border-surface/70 bg-neutral-50
-                 grid place-items-center cursor-pointer hover:bg-neutral-100 transition"
+				 grid place-items-center cursor-pointer hover:bg-neutral-100 transition"
 				>
 					<div class="text-center text-neutral-500">
 						<div class="text-5xl mb-2">📷</div>
-						<div>คลิกเพื่ออัปโหลดรูปภาพ</div>
-						<div class="text-xs mt-1">(สูงสุด {MAX_FILES} รูป)</div>
+						<div>Click to upload images</div>
+						<div class="text-xs mt-1">(Up to {MAX_FILES} images)</div>
 					</div>
 					<input
 						class="hidden"
@@ -189,7 +190,7 @@
 								<button
 									type="button"
 									class="absolute top-1 right-1 text-xs px-2 py-0.5 rounded bg-black/60 text-white opacity-0 group-hover:opacity-100"
-									on:click={() => removeAt(i)}>ลบ</button
+									on:click={() => removeAt(i)}>Remove</button
 								>
 								{#if f.error}
 									<div class="text-[10px] text-red-600 mt-1">{f.error}</div>
@@ -200,36 +201,39 @@
 				{/if}
 			</div>
 
-			<!-- ฟอร์ม (ขวา) -->
+			<!-- Form (right) -->
 			<div class="space-y-4">
 				<div>
-					<label class="block text-sm mb-1">ชื่อสินค้า</label>
+					<!-- svelte-ignore a11y_label_has_associated_control -->
+					<label class="block text-sm mb-1">Product Name</label>
 					<input
 						class="w-full rounded border px-3 py-2"
-						placeholder="เช่น หนังสือเรียน, เสื้อยูนิฟอร์ม"
+						placeholder="e.g. Textbook, Uniform"
 						bind:value={title}
 					/>
 				</div>
 
 				<div>
-					<label class="block text-sm mb-1">หมวดหมู่</label>
+					<!-- svelte-ignore a11y_label_has_associated_control -->
+					<label class="block text-sm mb-1">Category</label>
 					<select class="w-full rounded border px-3 py-2" bind:value={category}>
-						<option value="">-- เลือกหมวดหมู่ --</option>
-						<option value="BOOKS">หนังสือ</option>
-						<option value="CLOTHES">เสื้อผ้า</option>
-						<option value="GADGET">อุปกรณ์</option>
-						<option value="FURNITURE">เฟอร์นิเจอร์</option>
-						<option value="SPORTS">กีฬา</option>
-						<option value="STATIONERY">เครื่องเขียน</option>
-						<option value="ELECTRONICS">เครื่องใช้ไฟฟ้า</option>
-						<option value="VEHICLES">ยานพาหนะ</option>
-						<option value="MUSIC">ดนตรี</option>
-						<option value="OTHERS">อื่น ๆ</option>
+						<option value="">-- Select Category --</option>
+						<option value="BOOKS">Books</option>
+						<option value="CLOTHES">Clothes</option>
+						<option value="GADGET">Gadgets</option>
+						<option value="FURNITURE">Furniture</option>
+						<option value="SPORTS">Sports</option>
+						<option value="STATIONERY">Stationery</option>
+						<option value="ELECTRONICS">Electronics</option>
+						<option value="VEHICLES">Vehicles</option>
+						<option value="MUSIC">Music</option>
+						<option value="OTHERS">Others</option>
 					</select>
 				</div>
 
 				<div>
-					<label class="block text-sm mb-1">สภาพ</label>
+					<!-- svelte-ignore a11y_label_has_associated_control -->
+					<label class="block text-sm mb-1">Condition</label>
 					<select
 						class="w-full rounded border px-3 py-2"
 						name="condition"
@@ -243,7 +247,7 @@
 				</div>
 
 				<div>
-					<label class="block text-sm mb-1">ราคา</label>
+					<label class="block text-sm mb-1" for="price">Price</label>
 					<div class="flex">
 						<span class="inline-flex items-center px-3 border border-r-0 rounded-l bg-neutral-50"
 							>฿</span
@@ -257,13 +261,14 @@
 				</div>
 
 				<div>
-					<label class="block text-sm mb-1">รายละเอียด</label>
+					<!-- svelte-ignore a11y_label_has_associated_control -->
+					<label class="block text-sm mb-1">Description</label>
 					<textarea
 						class="w-full rounded border px-3 py-2"
 						rows="4"
-						placeholder="บอกรายละเอียดสินค้า สภาพ ฯลฯ"
+						placeholder="Describe your product, condition, etc."
 						bind:value={description}
-					/>
+					></textarea>
 				</div>
 			</div>
 		</div>
@@ -276,11 +281,11 @@
 
 		<div class="mt-6">
 			<button
-				class="w-full rounded-full bg-brand text-white py-3 text-lg font-semibold hover:bg-brand-2 disabled:opacity-60"
+				class="cursor-pointer tr w-full rounded-full bg-brand text-white py-3 text-lg font-semibold hover:bg-brand-h disabled:opacity-60"
 				on:click={submit}
 				disabled={creating}
 			>
-				{creating ? 'กำลังลงขาย...' : 'ลงขายสินค้า'}
+				{creating ? 'Posting...' : 'Post Product'}
 			</button>
 		</div>
 	</div>

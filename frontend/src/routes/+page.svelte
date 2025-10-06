@@ -2,9 +2,9 @@
 	import { apiJson } from '$lib/api/client';
 	import ProductGrid from '$lib/components/ProductGrid.svelte';
 	import { onMount } from 'svelte';
-	import { auth, openAuth } from '$lib/stores/auth'; //เอาไว้้เช็คว่า login หรือยัง
-	import { goto } from '$app/navigation'; //ให้เด้ง Popup login
-	// === DTO จาก backend ===
+	import { auth, openAuth } from '$lib/stores/auth'; // For checking login status
+	import { goto } from '$app/navigation'; // To trigger login popup
+	// === DTO from backend ===
 	type ListingDTO = {
 		id: string;
 		title: string;
@@ -13,11 +13,11 @@
 		condition: string; // NEW | LIKE_NEW | USED
 		status: string; // ACTIVE | SOLD | HIDDEN
 		createdAt: string;
-		imageUrls?: string[]; // << สำคัญ: ต้องมี field นี้
+		imageUrls?: string[]; // << Important: Must have this field
 		seller?: { id: string; name: string };
 	};
 
-	// === shape ให้การ์ด/กริด ===
+	// === Shape for card/grid ===
 	type ProductCardData = {
 		id: string;
 		title: string;
@@ -26,7 +26,7 @@
 		boosted?: boolean;
 	};
 
-	// (ออปชัน) ถ้าใช้ Cloudinary อยากให้เป็น thumbnail เร็วขึ้น
+	// (Optional) If using Cloudinary, generate thumbnail for faster loading
 	function toThumb(url?: string | null, size = 400) {
 		if (!url) return null;
 		return url.includes('/upload/')
@@ -40,7 +40,7 @@
 			id: x.id,
 			title: x.title,
 			price: x.price,
-			image: toThumb(cover), // << ใช้รูปแรกเป็นปก (ย่อด้วย transformation ถ้ามี)
+			image: toThumb(cover), // << Use the first image as cover (resize if possible)
 			boosted: false
 		};
 	}
@@ -67,13 +67,13 @@
 		}
 	}
 	function handlePostClick(e: MouseEvent) {
-		// ถ้ายังไม่ล็อกอิน → เปิด modal login แทนการไป /post
+		// If not logged in → open login modal instead of navigating to /post
 		if (!$auth.user) {
-			e.preventDefault(); // กันการนำทางของ <a>
-			openAuth('login'); // เปิดป๊อปอัพล็อกอิน
+			e.preventDefault(); // Prevent <a> navigation
+			openAuth('login'); // Open login popup
 			return;
 		}
-		// ถ้าล็อกอินแล้ว ปล่อยให้ลิงก์ทำงานตามปกติ หรือจะสั่ง goto ก็ได้:
+		// If logged in, allow normal link behavior or use goto:
 		// goto('/post');
 	}
 
@@ -81,36 +81,36 @@
 </script>
 
 <div class="flex flex-col items-center text-center bg-white p-16 gap-4 rounded-lg shadow">
-	<h1 class="text-brand text-3xl font-bold">ตลาดนัดมือสอง เพื่อนักศึกษา</h1>
-	<p class="text-lg text-neutral-600">ซื้อ-ขาย ปลอดภัย ยืนยันตัวตนด้วยอีเมลสถาบัน</p>
+	<h1 class="text-brand text-3xl font-bold">Secondhand Marketplace for Students</h1>
+	<p class="text-lg text-neutral-600">Buy and sell safely, verified with institutional email</p>
 	<a
 		href="/post"
 		on:click={handlePostClick}
 		class="
-            inline-flex items-center justify-center
-            py-2 px-6 rounded-full text-base font-bold text-white
-            border border-[color:var(--color-brand-orange)]
-            bg-brand hover:bg-brand-hover
-            sm:bg-transparent sm:text-brand sm:hover:bg-black
-            transition
-          "
+			inline-flex items-center justify-center
+			py-2 px-6 rounded-full text-base font-bold text-white
+			border border-[color:var(--color-brand-orange)]
+			bg-brand hover:bg-brand-hover
+			sm:bg-transparent sm:text-brand sm:hover:bg-black
+			transition
+		  "
 	>
-		ลงขายเลย !
+		Sell Now!
 	</a>
 </div>
 <section class="mx-auto max-w-6xl px-4 py-6 space-y-4 overflow-y-auto">
 	{#if loading}
-		<p>กำลังโหลด…</p>
+		<p>Loading…</p>
 	{:else if items.length === 0}
 		<div class="rounded-xl border border-dashed border-surface bg-white p-8 text-center">
-			<h3 class="text-lg font-semibold mb-2">ยังไม่มีประกาศสินค้า</h3>
-			<p class="text-sm text-neutral-600 mb-4">เป็นคนแรกที่ลงขายให้เพื่อน ๆ ในมอได้เลย!</p>
-			<!-- <a href="/post" class="inline-block rounded bg-brand text-white px-4 py-2">ลงขายเลย</a> -->
+			<h3 class="text-lg font-semibold mb-2">No product listings yet</h3>
+			<p class="text-sm text-neutral-600 mb-4">Be the first to sell to your fellow students!</p>
+			<!-- <a href="/post" class="inline-block rounded bg-brand text-white px-4 py-2">Sell Now</a> -->
 		</div>
 	{:else}
 		<div class="space-y-12">
 			<div>
-				<p class="mt-8 text-3xl text-gray-750 font-bold">✨ สินค้ามาใหม่ล่าสุด {total} รายการ</p>
+				<p class="mt-8 text-3xl text-gray-750 font-bold">✨ Latest Products: {total} items</p>
 			</div>
 			<ProductGrid {items} />
 		</div>

@@ -1,5 +1,6 @@
 <!-- src/lib/components/SellerOfferActions.svelte -->
 <script lang="ts">
+	import { toast } from '$lib/stores/toast';
 	export let offerId: string;
 	export let onChanged: () => void = () => {};
 
@@ -13,7 +14,7 @@
 				body: JSON.stringify({ action, ...payload })
 			});
 			const data = await r.json();
-			if (!r.ok) alert(data.message || 'ดำเนินการไม่สำเร็จ');
+			if (!r.ok) toast.error(data.message || 'Action failed');
 			else onChanged();
 		} finally {
 			loading = false;
@@ -25,11 +26,11 @@
 	let note = '';
 	let reason = '';
 
-	// สร้าง/โชว์ QR
+	// Create/Show QR
 	let qrUrl = '';
 	async function accept() {
 		await doAction('ACCEPT');
-		// หลัง accept ดึง offer เพื่อได้ token
+		// After accept, fetch offer to get token
 		const r = await fetch(`/api/offers/${offerId}`);
 		const { offer } = await r.json();
 		qrUrl = `${location.origin}/offer/confirm?offerId=${offerId}&token=${offer.qrToken}`;
@@ -62,16 +63,16 @@
 	</div>
 
 	<div class="grid grid-cols-2 gap-2">
-		<input class="rounded border px-2 py-1" placeholder="สถานที่ใหม่" bind:value={meetPlace} />
+		<input class="rounded border px-2 py-1" placeholder="New meeting place" bind:value={meetPlace} />
 		<input class="rounded border px-2 py-1" type="datetime-local" bind:value={meetTime} />
 	</div>
-	<input class="rounded border px-2 py-1 w-full" placeholder="โน้ต (ถ้ามี)" bind:value={note} />
-	<input class="rounded border px-2 py-1 w-full" placeholder="เหตุผล reject" bind:value={reason} />
+	<input class="rounded border px-2 py-1 w-full" placeholder="Note (optional)" bind:value={note} />
+	<input class="rounded border px-2 py-1 w-full" placeholder="Reason for rejection" bind:value={reason} />
 
 	{#if qrUrl}
 		<div class="mt-3 p-3 rounded border bg-surface-light">
-			<div class="text-sm font-semibold mb-2">QR สำหรับผู้ซื้อ</div>
-			<!-- ใช้ lib qrcodejs แบบง่าย หรือจะใช้ <img src={`https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=${encodeURIComponent(qrUrl)}`}> ก็ได้ -->
+			<div class="text-sm font-semibold mb-2">QR for Buyer</div>
+			<!-- Use qrcodejs library or <img src={`https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=${encodeURIComponent(qrUrl)}`}> -->
 			<img
 				alt="qr"
 				class="w-40 h-40"

@@ -47,13 +47,13 @@
 	const isId = (v: unknown): v is string => typeof v === 'string' && v.trim().length > 0;
 
 	function linkTarget(n: NotificationItem): string | undefined {
-		// ถ้าอยู่แท็บผู้ขาย → พาไปหน้าประกาศก่อน
+		// If on seller tab → go to listing page first
 		if (activeSide === 'seller') {
 			if (isId(n.listingId)) return `/listing/${n.listingId}`;
 			if (isId(n.offerId)) return `/offers/${n.offerId}`;
 			return undefined;
 		}
-		// แท็บผู้ซื้อ → ไปหน้า offer ก่อน
+		// Buyer tab → go to offer page first
 		if (isId(n.offerId)) return `/offers/${n.offerId}`;
 		if (isId(n.listingId)) return `/listing/${n.listingId}`;
 		return undefined;
@@ -112,7 +112,7 @@
 		connecting = true;
 		stopSSE();
 
-		// ยังไม่ล็อกอิน → ใช้ polling
+		// Not logged in → use polling
 		if (!$auth.user) {
 			startPolling(30000);
 			connecting = false;
@@ -120,7 +120,7 @@
 		}
 
 		try {
-			// แนบ token ผ่าน query เพื่อเลี่ยงข้อจำกัด header ของ EventSource
+			// Attach token via query to avoid EventSource header limitation
 			const token = $auth?.token;
 			const url = token
 				? sseUrl(`${STREAM_PATH}?token=${encodeURIComponent(token)}`)
@@ -242,13 +242,13 @@
 		aria-haspopup="menu"
 		aria-expanded={open}
 		on:click={toggle}
-		aria-label="การแจ้งเตือน"
+		aria-label="Notifications"
 	>
 		<BellSolid class="h-5 w-5 " />
 		{#if unreadTotal > 0}
 			<span
 				class="absolute -top-1 -right-1 min-w-[1.25rem] rounded-full bg-red-500 px-1.5 py-0.5 text-center text-[10px] leading-none text-white"
-				aria-label="ยังไม่ได้อ่าน {unreadTotal} รายการ"
+				aria-label="Unread {unreadTotal} items"
 			>
 				{unreadTotal}
 			</span>
@@ -264,12 +264,12 @@
 		>
 			<!-- header -->
 			<div class="flex items-center justify-between px-1 pb-2">
-				<div class="font-semibold">การแจ้งเตือน</div>
+				<div class="font-semibold">Notifications</div>
 				<button
 					class="text-xs underline hover:opacity-80 cursor-pointer"
 					on:click={markAllReadCurrent}
 				>
-					อ่านแท็บนี้เป็นอ่านแล้ว
+					Mark all as read (this tab)
 				</button>
 			</div>
 
@@ -280,14 +280,14 @@
 					on:click={() => switchTab('buyer')}
 					aria-pressed={activeSide === 'buyer'}
 				>
-					ฉันเป็นผู้ซื้อ
+					I am a buyer
 				</button>
 				<button
 					class={`cursor-pointer rounded-md px-3 py-1 text-sm transition ${activeSide === 'seller' ? 'bg-white shadow' : 'hover:bg-neutral-200'}`}
 					on:click={() => switchTab('seller')}
 					aria-pressed={activeSide === 'seller'}
 				>
-					ฉันเป็นผู้ขาย
+					I am a seller
 				</button>
 			</div>
 
@@ -306,7 +306,7 @@
 			{:else if currentItems.length === 0}
 				<div class="grid place-items-center gap-1 py-6 text-center text-neutral-500">
 					<BellSolid class="h-6 w-6 opacity-60" />
-					<div class="text-xs">ยังไม่มีแจ้งเตือน</div>
+					<div class="text-xs">No notifications yet</div>
 				</div>
 			{:else}
 				<ul class="divide-y">
@@ -357,7 +357,7 @@
 					{/each}
 				</ul>
 
-				<!-- footer: ดูทั้งหมด -->
+				<!-- footer: View all -->
 				<div class="mt-2 pt-2 border-t">
 					<a
 						href={`/offers`}
@@ -365,7 +365,7 @@
 						on:click={() => (open = false)}
 						role="menuitem"
 					>
-						ดูทั้งหมด
+						View all
 					</a>
 				</div>
 			{/if}

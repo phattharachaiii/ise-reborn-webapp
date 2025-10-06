@@ -1,5 +1,6 @@
 <!-- src/lib/components/QrScanModal.svelte -->
 <script lang="ts">
+	import { toast } from '$lib/stores/toast';
 	import { onMount, onDestroy, createEventDispatcher } from 'svelte';
 
 	export let open = false;
@@ -7,43 +8,43 @@
 
 	const dispatch = createEventDispatcher<{ result: string }>();
 
-	// แท็บที่มีให้ใช้
+	// Available tabs
 	type Tab = 'scan' | 'upload' | 'paste';
 	let activeTab: Tab = 'scan';
 
-	// state สแกนกล้อง
+	// Camera scan state
 	let videoEl: HTMLVideoElement | null = null;
 	let stream: MediaStream | null = null;
 	let hasCameraSupport = false;
 	let barcodeDetectorAvailable = 'BarcodeDetector' in globalThis;
-	let detector: any = null; // BarcodeDetector ถ้ามี
+	let detector: any = null; // BarcodeDetector if available
 
-	// state อัปโหลดรูป
+	// Image upload state
 	let imgPreviewUrl: string | null = null;
 
-	// state วางโค้ด
+	// Paste code state
 	let tokenInput = '';
 
 	// ===== Utils =====
 	/**
-	 * รองรับทั้ง
-	 *  - URL แบบเก่า: reborn://... ?t=TOKEN  -> คืนเฉพาะ TOKEN
-	 *  - URL แบบใหม่: https://... ?action=... -> คืน "ทั้ง URL" ให้ backend แปลต่อ
-	 *  - ข้อความล้วน/JSON/base64 -> คืนค่าที่รับมา (ให้ฝั่งถัดไปตัดสินใจ)
+	 * Supports:
+	 *  - Old URL: reborn://... ?t=TOKEN  -> return only TOKEN
+	 *  - New URL: https://... ?action=... -> return "full URL" for backend to parse
+	 *  - Plain text/JSON/base64 -> return as is (let next step decide)
 	 */
 	function parseTokenFromQR(raw: string): string | null {
 		try {
 			if (!raw) return null;
-			// เป็น URL?
+			// Is it a URL?
 			if (/^https?:\/\//i.test(raw) || /^[a-z]+:\/\//i.test(raw)) {
 				const u = new URL(raw);
 				const t = u.searchParams.get('t');
-				// ถ้ามี ?t= ให้คงพฤติกรรมเดิม (ส่งเฉพาะ token)
+				// If ?t= exists, return only the token
 				if (t) return t;
-				// ถ้าไม่มี ?t= ให้ส่ง "ทั้ง URL" กลับไปเพื่อให้ backend /api/qr แปล action เอง
+				// If no ?t=, return the full URL for backend /api/qr to parse action
 				return raw.trim();
 			}
-			// ไม่ใช่ URL -> ส่งข้อความล้วนกลับ
+			// Not a URL -> return plain text
 			return raw.trim();
 		} catch {
 			return null;
@@ -51,8 +52,8 @@
 	}
 	function ok(msg: string) {
 		const tokenOrRaw = parseTokenFromQR(msg);
-		if (!tokenOrRaw) return alert('QR/Token ไม่ถูกต้อง');
-		// ส่งขึ้น parent เหมือนเดิม (เดิมเคยรับ token; ตอนนี้ถ้าเป็น URL ใหม่จะได้ URL เต็ม)
+		if (!tokenOrRaw) return toast.error('QR/Token Not Valid');
+		// Send to parent (previously only token; now may be full URL)
 		dispatch('result', tokenOrRaw);
 	}
 
@@ -105,7 +106,7 @@
 					return;
 				}
 			} else {
-				// fallback (ต้องมี jsQR ติดตั้งในโครงการ ถ้าไม่มีจะข้าม)
+				// fallback (requires jsQR installed in project, otherwise skip)
 				const { default: jsQR } = await import('jsqr').catch(() => ({ default: null as any }));
 				if (jsQR) {
 					if (!canvas) {
@@ -142,7 +143,7 @@
 
 		try {
 			const bmp = await createImageBitmap(file);
-			// BarcodeDetector ก่อน
+			// BarcodeDetector first
 			if (barcodeDetectorAvailable) {
 				if (!detector) {
 					// @ts-ignore
@@ -171,9 +172,9 @@
 					return;
 				}
 			}
-			alert('อ่าน QR จากรูปไม่สำเร็จ ลองรูปที่คมชัด/สว่างขึ้น');
+			toast.error('Failed to read QR from image. Try a clearer/brighter image.');
 		} catch {
-			alert('ไม่สามารถอ่านรูปได้');
+			toast.error('Cannot read image.');
 		}
 	}
 
@@ -184,9 +185,9 @@
 
 	// ===== Lifecycle =====
 	onMount(async () => {
-		// ตรวจความสามารถของกล้อง
+		// Check camera support
 		hasCameraSupport = !!navigator.mediaDevices?.getUserMedia;
-		if (!hasCameraSupport) activeTab = 'upload'; // ไม่มีกล้อง → ไปอัปโหลด
+		if (!hasCameraSupport) activeTab = 'upload'; // No camera → switch to upload
 
 		if (open && hasCameraSupport && activeTab === 'scan') {
 			await startCamera();
@@ -195,7 +196,7 @@
 	});
 
 	$: (async () => {
-		// เมื่อ open/activeTab เปลี่ยน คุมกล้อง
+		// When open/activeTab changes, control camera
 		if (open && activeTab === 'scan' && hasCameraSupport) {
 			if (!stream) await startCamera();
 			if (rafId == null) tickScanLoop();
@@ -216,31 +217,39 @@
 	<div class="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
 		<div class="w-full max-w-md rounded-lg bg-white shadow-xl">
 			<div class="flex items-center justify-between border-b p-3">
-				<div class="font-semibold">ยืนยันดีลด้วย QR/โค้ด</div>
-				<button class="px-2 py-1 text-sm" on:click={onClose}>ปิด</button>
+				<div class="font-semibold">Confirm deal with QR/Code</div>
+				<button
+					class="px-2 py-1 text-sm font-semibold text-gray-600 hover:text-white
+		 bg-gray-100 hover:bg-red-500 border border-gray-200
+		 rounded-full shadow-sm transition-all duration-200
+		 hover:scale-105 active:scale-95 cursor-pointer"
+					on:click={onClose}
+				>
+					✕
+				</button>
 			</div>
 
 			<!-- Tabs -->
 			<div class="flex gap-1 p-2">
 				<button
-					class="px-3 py-1 rounded {activeTab === 'scan'
+					class="cursor-pointer hover:bg-gray-700 transition-colors duration-200 hover:text-white px-3 py-1 rounded {activeTab === 'scan'
 						? 'bg-black text-white'
 						: 'bg-neutral-100'} disabled:opacity-50"
 					on:click={() => (activeTab = 'scan')}
 					disabled={!hasCameraSupport}
-					title={hasCameraSupport ? '' : 'อุปกรณ์นี้ไม่รองรับการสแกนกล้อง'}>สแกนกล้อง</button
+					title={hasCameraSupport ? '' : 'This device does not support camera scanning'}>Scan Camera</button
 				>
 				<button
-					class="px-3 py-1 rounded {activeTab === 'upload'
+					class="cursor-pointer hover:bg-gray-700 transition-colors duration-200 hover:text-white px-3 py-1 rounded {activeTab === 'upload'
 						? 'bg-black text-white'
 						: 'bg-neutral-100'}"
-					on:click={() => (activeTab = 'upload')}>อัปโหลดรูป</button
+					on:click={() => (activeTab = 'upload')}>Upload Image</button
 				>
 				<button
-					class="px-3 py-1 rounded {activeTab === 'paste'
+					class="cursor-pointer hover:bg-gray-700 transition-colors duration-200 hover:text-white px-3 py-1 rounded {activeTab === 'paste'
 						? 'bg-black text-white'
 						: 'bg-neutral-100'}"
-					on:click={() => (activeTab = 'paste')}>วางโค้ด</button
+					on:click={() => (activeTab = 'paste')}>Paste Code</button
 				>
 			</div>
 
@@ -250,11 +259,11 @@
 					{#if hasCameraSupport}
 						<video bind:this={videoEl} class="w-full rounded bg-black" playsinline></video>
 						<p class="text-xs text-neutral-500">
-							หากภาพมืด/เบลอ ให้ลองปรับแสงหรือสลับไป “อัปโหลดรูป” แทน
+							If the image is dark/blurry, try adjusting the lighting or switch to "Upload Image".
 						</p>
 					{:else}
 						<div class="rounded border bg-yellow-50 p-3 text-sm">
-							อุปกรณ์นี้ไม่รองรับการสแกนอัตโนมัติ กรุณาใช้งาน “อัปโหลดรูป” หรือ “วางโค้ด”
+							This device does not support automatic scanning. Please use "Upload Image" or "Paste Code".
 						</div>
 					{/if}
 				{:else if activeTab === 'upload'}
@@ -266,19 +275,19 @@
 							class="mt-2 max-h-56 rounded border object-contain"
 						/>
 					{/if}
-					<p class="text-xs text-neutral-500">เลือกรูปที่คมชัด เห็น QR เต็ม ๆ</p>
+					<p class="text-xs text-neutral-500">Choose a clear image with the full QR visible.</p>
 				{:else if activeTab === 'paste'}
 					<label class="block text-sm mb-1"
-						>วางโค้ดหรือลิงก์ (รองรับทั้งโค้ดล้วน และ URL ที่ไม่มี ?t=)</label
+						>Paste code or link (supports both plain code and URLs without ?t=)</label
 					>
 					<input
 						class="w-full rounded border px-3 py-2"
-						placeholder="เช่น https://app.example/qr/buy-request/xxx หรือ วางโค้ดล้วน ๆ"
+						placeholder="e.g. https://app.example/qr/buy-request/xxx or paste plain code"
 						bind:value={tokenInput}
 					/>
 					<div class="mt-2">
-						<button class="rounded bg-black text-white px-3 py-1" on:click={submitPasted}>
-							ใช้โค้ดนี้
+						<button class="cursor-pointer rounded bg-brand hover:bg-brand-h text-white px-3 py-1" on:click={submitPasted}>
+							Use this code
 						</button>
 					</div>
 				{/if}

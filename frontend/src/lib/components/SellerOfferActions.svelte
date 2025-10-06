@@ -1,6 +1,7 @@
 <!-- src/lib/components/SellerOfferActions.svelte -->
 <script lang="ts">
-	// ✅ ใช้เวอร์ชันไม่พึ่งไลบรารีอื่น
+	import { toast } from "$lib/stores/toast";
+	// ✅ No external library version
 	export let offerId: string;
 	export let onChanged: () => void = () => {};
 
@@ -14,31 +15,31 @@
 				body: JSON.stringify({ action, ...payload })
 			});
 			const data = await r.json();
-			if (!r.ok) alert(data.message || 'ดำเนินการไม่สำเร็จ');
+			if (!r.ok) toast.error(data.message || 'Action failed');
 			else onChanged();
 		} finally {
 			loading = false;
 		}
 	}
 
-	// ฟอร์มย่อย (รีออฟเฟอร์)
+	// Subform (Reoffer)
 	let meetPlace = '';
 	let meetTime = '';
 	let note = '';
 	let reason = '';
 
 	// ===== QR control =====
-	let qrUrl = ''; // ลิงก์ QR (ถูกสร้างหลัง ACCEPT)
-	let qrVisible = false; // แสดง/ซ่อนรูป QR
-	let qrFullscreen = false; // โหมดเต็มหน้าจอ (มือถือ)
+	let qrUrl = ''; // QR link (generated after ACCEPT)
+	let qrVisible = false; // Show/hide QR image
+	let qrFullscreen = false; // Fullscreen mode (mobile)
 
 	async function accept() {
 		await doAction('ACCEPT');
-		// ดึง token เพื่อสร้างลิงก์ QR
+		// Fetch token to generate QR link
 		const r = await fetch(`/api/offers/${offerId}`);
 		const { offer } = await r.json();
 		if (!offer?.qrToken) {
-			alert('ยังไม่ได้รับโค้ด QR จากเซิร์ฟเวอร์');
+			toast.error('QR code not received from server');
 			return;
 		}
 		qrUrl = `${location.origin}/offer/confirm?offerId=${offerId}&token=${offer.qrToken}`;
@@ -49,9 +50,9 @@
 		if (!qrUrl) return;
 		try {
 			await navigator.clipboard.writeText(qrUrl);
-			alert('คัดลอกลิงก์ QR แล้ว');
+			toast.success('QR link copied');
 		} catch {
-			alert('คัดลอกไม่สำเร็จ');
+			toast.error('Copy failed');
 		}
 	}
 
@@ -62,7 +63,7 @@
 </script>
 
 <div class="space-y-3">
-	<!-- ปุ่มหลัก -->
+	<!-- Main buttons -->
 	<div class="grid grid-cols-3 gap-2">
 		<button
 			class="rounded px-3 py-2 bg-brand text-white disabled:opacity-60"
@@ -87,41 +88,41 @@
 		</button>
 	</div>
 
-	<!-- ฟอร์มย่อยสำหรับ Reoffer -->
+	<!-- Subform for Reoffer -->
 	<div class="grid grid-cols-2 gap-2">
-		<input class="rounded border px-2 py-1" placeholder="สถานที่ใหม่" bind:value={meetPlace} />
+		<input class="rounded border px-2 py-1" placeholder="New meeting place" bind:value={meetPlace} />
 		<input class="rounded border px-2 py-1" type="datetime-local" bind:value={meetTime} />
 	</div>
-	<input class="rounded border px-2 py-1 w-full" placeholder="โน้ต (ถ้ามี)" bind:value={note} />
-	<input class="rounded border px-2 py-1 w-full" placeholder="เหตุผล reject" bind:value={reason} />
+	<input class="rounded border px-2 py-1 w-full" placeholder="Note (optional)" bind:value={note} />
+	<input class="rounded border px-2 py-1 w-full" placeholder="Reject reason" bind:value={reason} />
 
-	<!-- กล่อง QR -->
+	<!-- QR box -->
 	{#if qrUrl}
 		<div class="rounded border bg-surface-light p-3">
 			<div class="flex items-center justify-between gap-2">
-				<div class="text-sm font-semibold">QR สำหรับผู้ซื้อ</div>
+				<div class="text-sm font-semibold">QR for Buyer</div>
 				<div class="flex items-center gap-2">
 					<button
 						class="rounded px-2 py-1 text-xs border"
 						on:click={() => (qrVisible = !qrVisible)}
 						aria-pressed={qrVisible}
 					>
-						{qrVisible ? 'ซ่อน QR' : 'แสดง QR'}
+						{qrVisible ? 'Hide QR' : 'Show QR'}
 					</button>
-					<button class="rounded px-2 py-1 text-xs border" on:click={copyQr}>คัดลอกลิงก์</button>
-					<button class="rounded px-2 py-1 text-xs border" on:click={openQr}>เปิดลิงก์</button>
+					<button class="rounded px-2 py-1 text-xs border" on:click={copyQr}>Copy link</button>
+					<button class="rounded px-2 py-1 text-xs border" on:click={openQr}>Open link</button>
 					<button
 						class="rounded px-2 py-1 text-xs bg-black text-white disabled:opacity-50"
 						on:click={() => (qrFullscreen = true)}
 						disabled={!qrVisible}
-						title={!qrVisible ? 'กดแสดง QR ก่อน' : 'เปิดแบบเต็มหน้าจอ'}
+						title={!qrVisible ? 'Press Show QR first' : 'Open fullscreen'}
 					>
-						เต็มจอ
+						Fullscreen
 					</button>
 				</div>
 			</div>
 
-			<!-- รูป QR (Mobile-first) -->
+			<!-- QR image (Mobile-first) -->
 			<div class="mt-2 grid place-items-center">
 				<div class="qr-box relative">
 					<img
@@ -133,7 +134,7 @@
 					/>
 					{#if !qrVisible}
 						<div class="qr-overlay">
-							<div class="qr-overlay-card">แตะ “แสดง QR” เพื่อเปิดเผย</div>
+							<div class="qr-overlay-card">Tap “Show QR” to reveal</div>
 						</div>
 					{/if}
 				</div>
@@ -145,14 +146,14 @@
 		</div>
 	{/if}
 
-	<!-- เต็มหน้าจอ -->
+	<!-- Fullscreen -->
 	{#if qrFullscreen}
 		<div class="fixed inset-0 z-50 flex flex-col bg-black/95">
 			<div class="flex items-center justify-between p-3">
 				<button class="rounded px-3 py-2 text-sm bg-white" on:click={() => (qrFullscreen = false)}>
-					ปิด
+					Close
 				</button>
-				<div class="text-white text-sm opacity-80">QR สำหรับยืนยันหน้างาน</div>
+				<div class="text-white text-sm opacity-80">QR for on-site confirmation</div>
 				<div class="w-[68px]"></div>
 			</div>
 
@@ -166,8 +167,8 @@
 			</div>
 
 			<div class="p-3 grid grid-cols-2 gap-2">
-				<button class="rounded bg-white py-2 text-sm" on:click={copyQr}>คัดลอกลิงก์</button>
-				<button class="rounded bg-white py-2 text-sm" on:click={openQr}>เปิดลิงก์</button>
+				<button class="rounded bg-white py-2 text-sm" on:click={copyQr}>Copy link</button>
+				<button class="rounded bg-white py-2 text-sm" on:click={openQr}>Open link</button>
 			</div>
 		</div>
 	{/if}

@@ -22,8 +22,8 @@
 	class="border-2 border-dashed border-surface rounded-lg h-[300px] w-full flex flex-col items-center justify-center text-center cursor-pointer hover:border-[color:var(--color-brand-orange)] hover:bg-orange-50 transition"
 >
 	<div class="text-4xl">📷</div>
-	<div class="text-neutral-500">คลิกเพื่ออัปโหลดรูปภาพ</div>
-	<small class="text-neutral-400">(สูงสุด {max} รูป)</small>
+	<div class="text-neutral-500">Click to upload images</div>
+	<small class="text-neutral-400">(Maximum {max} images)</small>
 	<input
 		bind:this={inputEl}
 		type="file"

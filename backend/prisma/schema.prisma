@@ -5,8 +5,9 @@ generator client {
 
 // ===== datasource =====
 datasource db {
-  provider = "postgresql"
-  url      = env("DATABASE_URL")
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
+  directUrl = env("DIRECT_URL")
 }
 
 // ===== enums =====
@@ -39,16 +40,14 @@ enum Category {
   OTHERS
 }
 
-/**
- * 👉 เวิร์กโฟลว์ Offer
- */
+
 enum OfferStatus {
-  REQUESTED // ผู้ซื้อเพิ่งเสนอ
-  ACCEPTED // ฝั่งตรงข้ามยอมรับ (มี qrToken), Listing ควรเป็น PENDING (ถ้าใช้)
+  REQUESTED 
+  ACCEPTED 
   REJECTED
-  REOFFER // ฝ่ายตรงข้ามปรับวันเวลา/สถานที่
-  COMPLETED // ยืนยันสำเร็จ
-  CANCELLED // เผื่ออนาคต
+  REOFFER 
+  COMPLETED 
+  CANCELLED 
 }
 
 enum OfferActor {
@@ -56,9 +55,7 @@ enum OfferActor {
   SELLER
 }
 
-/**
- * ประเภทการแจ้งเตือน
- */
+
 enum NotificationType {
   OFFER_REQUESTED
   OFFER_ACCEPTED
@@ -67,9 +64,7 @@ enum NotificationType {
   OFFER_COMPLETED
 }
 
-/**
- * (ออปชัน) สถานะรายการขาย สำหรับรองรับ Pending หลัง Accept
- */
+
 enum ListingStatus {
   ACTIVE
   PENDING
@@ -82,13 +77,12 @@ model User {
   id           String  @id @default(cuid())
   email        String  @unique
   passwordHash String
-  name         String? // ไม่ unique เพื่อรองรับชื่อซ้ำ
+  name         String? 
   avatarUrl    String?
   bio          String?
 
-  // ออปชันไว้รองรับหลายมหาลัย/รูปแบบในอนาคต
-  orgDomain String? // เก็บโดเมนจากอีเมล เช่น "kmitl.ac.th"
-  studentId String? // เผื่อบางที่ต้องการ (ไม่ unique)
+  orgDomain String? 
+  studentId String? 
 
   role          Role          @default(USER)
   accountStatus AccountStatus @default(ACTIVE)
@@ -97,13 +91,11 @@ model User {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  // ความสัมพันธ์
   listings       Listing[]      @relation("UserListings")
   offersAsBuyer  Offer[]        @relation("OfferBuyer")
   offersAsSeller Offer[]        @relation("OfferSeller")
   notifications  Notification[]
 
-  // การรายงานผู้ใช้
   reportsAuthored Report[] @relation("ReportAuthor")
   reportsAgainst  Report[] @relation("ReportTarget")
 }

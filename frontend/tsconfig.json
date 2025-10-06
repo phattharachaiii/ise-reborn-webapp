@@ -9,11 +9,12 @@
 		"skipLibCheck": true,
 		"sourceMap": true,
 		"strict": true,
-		"moduleResolution": "bundler"
+		"moduleResolution": "bundler",
+		"types": [
+			"svelte",
+			"vite/client"
+		] // ⬅️ เพิ่มได้ ช่วยเรื่อง import.meta, HMR ฯลฯ
+    // ถ้าต้องใช้ tooling นอก SvelteKit ที่ไม่เข้าใจ alias ของ Kit
+		// "paths": { "$lib/*": ["src/lib/*"] }
 	}
-	// Path aliases are handled by https://svelte.dev/docs/kit/configuration#alias
-	// except $lib which is handled by https://svelte.dev/docs/kit/configuration#files
-	//
-	// To make changes to top-level options such as include and exclude, we recommend extending
-	// the generated config; see https://svelte.dev/docs/kit/configuration#typescript
 }

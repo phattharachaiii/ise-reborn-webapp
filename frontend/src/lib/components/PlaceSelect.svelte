@@ -1,41 +1,63 @@
 <!-- src/lib/components/PlaceSelect.svelte -->
 <script lang="ts">
-	// dropdown รายชื่อจาก /api/meet-places + ตัวเลือก "OTHER" เพื่อพิมพ์เอง
-	export let value = ''; // bind:value ← ชื่อสถานที่ที่เลือก (หรือที่พิมพ์เอง)
+	import { onMount } from 'svelte';
+	import { CAMPUS_SPOTS, type CampusSpot } from '$lib/constants/meet-places';
+
+	export let value = ''; // ชื่อสถานที่ที่เลือก (หรือที่พิมพ์เอง)
 	export let required = false;
 	export let allowCustom = true;
 	export let disabled = false;
 	export let name = 'meetPlace';
 
-	let options: Array<{ id: string; name: string; area: string; open?: string | null }> = [];
-	let loading = false;
-	let error = '';
-
 	const OTHER = '__OTHER__';
 	let mode: 'LIST' | 'OTHER' = 'LIST';
 	let customText = '';
+	let error = '';
 
-	async function load() {
-		loading = true;
-		error = '';
-		try {
-			// เรียกโดยไม่ใส่ q → backend จะส่ง top 10 กลับมา
-			const r = await fetch('/api/meet-places', { credentials: 'include' });
-			const j = await r.json();
-			if (!r.ok) throw new Error(j?.message || 'โหลดสถานที่ไม่สำเร็จ');
-			options = Array.isArray(j?.suggestions) ? j.suggestions : [];
-			// ถ้า value ที่ส่งเข้ามาไม่ตรงกับ options ให้สลับไปโหมด OTHER
-			if (value && !options.some((o) => o.name === value)) {
-				mode = 'OTHER';
-				customText = value;
-			}
-		} catch (e: any) {
-			error = e?.message || 'โหลดสถานที่ไม่สำเร็จ';
-		} finally {
-			loading = false;
+	// 1) เรียงและจัดกลุ่มตาม area
+	const grouped = (() => {
+		// เรียงชื่อภายในโซน
+		const sorted: CampusSpot[] = [...CAMPUS_SPOTS].sort((a, b) =>
+			a.name.localeCompare(b.name, 'th')
+		);
+		// ลำดับโซน (ปรับได้ตามที่อยากให้โชว์ก่อน-หลัง)
+		const AREA_ORDER = [
+			'โซนคณะ',
+			'โซนอาคารเรียนรวม',
+			'โซนวิชาการ',
+			'โซนสำนักงาน',
+			'โซนกลาง',
+			'โซนหอพัก',
+			'โซนสวัสดิการ',
+			'โซนกีฬา',
+			'โซนพักผ่อน',
+			'การเดินทาง',
+			'ทางเข้า-ออก',
+			'อื่นๆ'
+		];
+		const buckets = new Map<string, CampusSpot[]>();
+		for (const s of sorted) {
+			const k = s.area || 'อื่นๆ';
+			if (!buckets.has(k)) buckets.set(k, []);
+			buckets.get(k)!.push(s);
+		}
+		// คืนเป็น array เพื่อวนซ้ำใน template
+		const byOrder = [...buckets.entries()].sort((a, b) => {
+			const ia = AREA_ORDER.indexOf(a[0]);
+			const ib = AREA_ORDER.indexOf(b[0]);
+			return (ia === -1 ? 999 : ia) - (ib === -1 ? 999 : ib);
+		});
+		return byOrder; // [ [area, CampusSpot[]], ... ]
+	})();
+
+	function hydrateInitial() {
+		// ถ้ามีค่าเริ่มต้น แต่ไม่พบใน list → OTHER
+		const all = grouped.flatMap(([, arr]) => arr);
+		if (value && !all.some((o) => o.name === value)) {
+			mode = 'OTHER';
+			customText = value;
 		}
 	}
-	load();
 
 	function onSelect(e: Event) {
 		const v = (e.target as HTMLSelectElement).value;
@@ -46,11 +68,16 @@
 			return;
 		}
 		mode = 'LIST';
-		const found = options.find((o) => o.id === v);
+		// map จาก id → name
+		const all = grouped.flatMap(([, arr]) => arr);
+		const found = all.find((o) => o.id === v);
 		value = found ? found.name : '';
 	}
 
+	// sync ค่าเมื่อโหมด OTHER
 	$: if (mode === 'OTHER') value = customText;
+
+	onMount(hydrateInitial);
 </script>
 
 <div class="space-y-2">
@@ -58,19 +85,25 @@
 		class="w-full rounded border px-3 py-2"
 		{name}
 		on:change={onSelect}
-		disabled={disabled || loading}
-		aria-busy={loading}
+		{disabled}
 		required={required && mode === 'LIST'}
 	>
 		<option value="">-- เลือกสถานที่นัด --</option>
-		{#each options as o}
-			<option value={o.id} selected={mode === 'LIST' && value === o.name}>
-				{o.name}
-				{o.open ? `(${o.open})` : ''}
-			</option>
+
+		{#each grouped as [area, spots] (area)}
+			<optgroup label={area}>
+				{#each spots as o (o.id)}
+					<option value={o.id} selected={mode === 'LIST' && value === o.name}>
+						{o.name}{o.open ? ` (${o.open})` : ''}
+					</option>
+				{/each}
+			</optgroup>
 		{/each}
+
 		{#if allowCustom}
-			<option value="__OTHER__" selected={mode === 'OTHER'}>อื่น ๆ (พิมพ์เอง)</option>
+			<optgroup label="กำหนดเอง">
+				<option value={OTHER} selected={mode === 'OTHER'}>อื่น ๆ (พิมพ์เอง)</option>
+			</optgroup>
 		{/if}
 	</select>
 

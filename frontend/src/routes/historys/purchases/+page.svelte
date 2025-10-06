@@ -25,7 +25,7 @@
       const data = await apiJson<{ items: Item[] }>('/api/history/purchases');
       items = data.items ?? [];
     } catch (e: any) {
-      err = e?.message ?? 'โหลดไม่สำเร็จ';
+      err = e?.message ?? 'Failed to load';
     } finally {
       loading = false;
     }
@@ -82,15 +82,15 @@
 <section class="mx-auto max-w-5xl px-4 py-6 space-y-4">
   <div class="flex items-center justify-between bg-white border border-surface p-4 rounded-xl">
     <div >
-      <h1 class="text-2xl font-bold">ประวัติการซื้อ</h1>
-      <p class="text-sm text-neutral-500">ดีลที่คุณเคยนัดซื้อทั้งหมดในระบบ</p>
+      <h1 class="text-2xl font-bold">Purchase History</h1>
+      <p class="text-sm text-neutral-500">All deals you have made in the system</p>
     </div>
     <button
       class="cursor-pointer rounded-full border border-surface px-4 py-2 text-sm hover:bg-neutral-50"
       on:click={load}
       disabled={loading}
     >
-      {loading ? 'กำลังโหลด…' : 'รีเฟรช'}
+      {loading ? 'Loading…' : 'Refresh'}
     </button>
   </div>
 
@@ -99,11 +99,11 @@
     <div class="grid gap-3 sm:grid-cols-2">
       {#each Array(6) as _}
         <div class="rounded-xl border border-surface bg-white p-3 flex gap-3">
-          <div class="h-20 w-20 rounded-lg bg-neutral-200 animate-pulse" />
+          <div class="h-20 w-20 rounded-lg bg-neutral-200 animate-pulse"></div>
           <div class="flex-1 space-y-2">
-            <div class="h-4 w-3/4 bg-neutral-200 rounded animate-pulse" />
-            <div class="h-3 w-1/2 bg-neutral-200 rounded animate-pulse" />
-            <div class="h-3 w-2/3 bg-neutral-200 rounded animate-pulse" />
+            <div class="h-4 w-3/4 bg-neutral-200 rounded animate-pulse"></div>
+            <div class="h-3 w-1/2 bg-neutral-200 rounded animate-pulse"></div>
+            <div class="h-3 w-2/3 bg-neutral-200 rounded animate-pulse"></div>
           </div>
         </div>
       {/each}
@@ -111,18 +111,18 @@
   {:else if err}
     <div class="rounded-xl border border-red-200 bg-red-50 p-3 text-red-700 text-sm flex items-start justify-between gap-3">
       <span>{err}</span>
-      <button class="cursor-pointer rounded border px-3 py-1 text-sm" on:click={load}>ลองใหม่</button>
+      <button class="cursor-pointer rounded border px-3 py-1 text-sm" on:click={load}>Try Again</button>
     </div>
   {:else if items.length === 0}
     <!-- Empty state -->
     <div class="rounded-xl border border-dashed border-surface bg-white p-10 text-center space-y-2">
-      <div class="text-lg font-semibold">ยังไม่มีประวัติการซื้อ</div>
-      <p class="text-sm text-neutral-500">เริ่มต้นเลือกดูสินค้าจากหน้าแรกได้เลย</p>
+      <div class="text-lg font-semibold">No purchase history yet</div>
+      <p class="text-sm text-neutral-500">Start browsing products from the homepage</p>
       <a
         href="/"
         class="inline-flex items-center gap-2 rounded-full bg-brand text-white px-4 py-2 text-sm hover:bg-brand-2 transition"
       >
-        ไปหน้าแรก
+        Go to Homepage
       </a>
     </div>
   {:else}
@@ -156,21 +156,21 @@
               <div class="mt-1 text-[15px] font-bold text-brand">{THB(it.listing.price)}</div>
 
               <div class="mt-1 text-sm text-neutral-600">
-                ผู้ขาย: <span class="font-medium">{it.seller?.name}</span>
+                Seller: <span class="font-medium">{it.seller?.name}</span>
                 <span class="mx-2">•</span>
-                นัดรับ: <span class="font-medium">{it.meetPlace}</span>
+                Meet at: <span class="font-medium">{it.meetPlace}</span>
               </div>
               <div class="text-xs text-neutral-500">
-                เวลา: {new Date(it.meetTime).toLocaleString()}
+                Time: {new Date(it.meetTime).toLocaleString()}
               </div>
 
               <div class="mt-2 flex items-center justify-between gap-2">
-                <div class="text-[11px] text-neutral-400">อัปเดต: {new Date(it.updatedAt).toLocaleString()}</div>
+                <div class="text-[11px] text-neutral-400">Updated: {new Date(it.updatedAt).toLocaleString()}</div>
                 <a
                   href={`/offers/${it.id}`}
                   class="inline-flex items-center gap-1 rounded-full border px-3 py-1 text-xs hover:bg-neutral-50"
                 >
-                  ดูรายละเอียดดีล
+                  View Deal Details
                 </a>
               </div>
             </div>
@@ -182,6 +182,6 @@
 </section>
 
 <style>
-  /* ป้องกันชื่อสินค้ายาวล้น */
+  /* Prevent long product names from overflowing */
   a.truncate { max-width: 48ch; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 </style>

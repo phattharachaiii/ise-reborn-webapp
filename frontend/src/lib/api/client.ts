@@ -2,7 +2,7 @@
 import { get } from 'svelte/store';
 import { auth } from '$lib/stores/auth';
 
-const API_BASE = import.meta.env.VITE_API_BASE ?? 'http://localhost:3000';
+const API_BASE = import.meta.env.PUBLIC_BACKEND_ORIGIN ?? 'http://localhost:3000';
 
 function apiUrl(path: string) {
   if (!path) return API_BASE;

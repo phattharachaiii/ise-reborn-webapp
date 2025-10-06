@@ -2,9 +2,9 @@
 	import { page } from '$app/stores';
 	import { apiJson } from '$lib/api/client';
 	import { auth, openAuth } from '$lib/stores/auth';
-	import QrScanModal from '$lib/components/QrScanModal.svelte'; // 👈 โมดัลสแกน
+	import QrScanModal from '$lib/components/QrScanModal.svelte'; // 👈 Scan modal
 	import PlaceSelect from '$lib/components/PlaceSelect.svelte';
-
+	import { toast } from '$lib/stores/toast';
 	type Offer = {
 		id: string;
 		status: 'REQUESTED' | 'ACCEPTED' | 'REJECTED' | 'REOFFER' | 'COMPLETED';
@@ -46,7 +46,7 @@
 		reMeetPlace = '',
 		reMeetTime = '';
 
-	// 👇 โมดัลสแกน/กรอกโค้ด
+	// 👇 Scan/enter code modal
 	let showScan = false;
 
 	const id = $page.params.id;
@@ -59,7 +59,7 @@
 			offer = data.offer;
 			meta = data.meta;
 		} catch (e: any) {
-			err = e?.message || 'โหลดไม่สำเร็จ';
+			err = e?.message || 'Failed to load';
 			offer = null;
 			meta = null;
 		} finally {
@@ -79,7 +79,7 @@
 			});
 			await load();
 		} catch (e: any) {
-			alert(e?.message || 'ทำรายการไม่สำเร็จ');
+			toast.error(e?.message || 'Action failed');
 		} finally {
 			working = false;
 		}
@@ -97,17 +97,17 @@
 			showReject = false;
 			rejectReason = '';
 		} catch (e: any) {
-			alert(e?.message || 'ทำรายการไม่สำเร็จ');
+			toast.error(e?.message || 'Action failed');
 		} finally {
 			working = false;
 		}
 	}
 
-	// ===== Utils: ห้ามเลือกอดีต (+5 นาที)
+	// ===== Utils: Prevent selecting past (+5 minutes)
 	function minLocalDateTimeString(addMinutes = 5) {
 		const d = new Date(Date.now() + addMinutes * 60000);
 		d.setSeconds(0, 0);
-		// แปลงเป็น local datetime (สำหรับ input type=datetime-local)
+		// Convert to local datetime (for input type=datetime-local)
 		const local = new Date(d.getTime() - d.getTimezoneOffset() * 60000);
 		return local.toISOString().slice(0, 16);
 	}
@@ -115,16 +115,16 @@
 
 	async function doReoffer() {
 		if (!offer) return;
-		if (!reMeetPlace || !reMeetTime) return alert('กรอกสถานที่และเวลาให้ครบ');
+		if (!reMeetPlace || !reMeetTime) return toast.error('Please fill in both place and time');
 
-		const chosen = new Date(reMeetTime); // string แบบ "YYYY-MM-DDTHH:mm" (local)
+		const chosen = new Date(reMeetTime); // string like "YYYY-MM-DDTHH:mm" (local)
 		if (isNaN(chosen.getTime())) {
-			alert('รูปแบบเวลาไม่ถูกต้อง');
+			toast.error('Invalid time format');
 			return;
 		}
 		const MIN_DELTA_MS = 5 * 60 * 1000;
 		if (chosen.getTime() < Date.now() + MIN_DELTA_MS) {
-			alert('กรุณาเลือกเวลาที่มากกว่าปัจจุบันอย่างน้อย 5 นาที');
+			toast.error('Please select a time at least 5 minutes from now');
 			return;
 		}
 
@@ -135,22 +135,22 @@
 				body: JSON.stringify({
 					action: 'REOFFER',
 					meetPlace: reMeetPlace,
-					meetTime: chosen.toISOString() // ส่งเป็น ISO เสมอ
+					meetTime: chosen.toISOString() // Always send as ISO
 				})
 			});
 			await load();
 			showReoffer = false;
 			reMeetPlace = '';
 			reMeetTime = '';
-			minDT = minLocalDateTimeString(5); // รีเฟรชค่า min
+			minDT = minLocalDateTimeString(5); // Refresh min value
 		} catch (e: any) {
-			alert(e?.message || 'ทำรายการไม่สำเร็จ');
+			toast.error(e?.message || 'Action failed');
 		} finally {
 			working = false;
 		}
 	}
 
-	// ====== ยืนยันหน้างานด้วยโค้ด (จากสแกน/อัปโหลด/วาง) ======
+	// ====== Confirm on-site with code (from scan/upload/paste) ======
 	async function verifyScan(token: string) {
 		if (!offer) return;
 		try {
@@ -159,10 +159,10 @@
 				body: JSON.stringify({ action: 'SCAN', token })
 			});
 			await load();
-			alert('ยืนยันหน้างานสำเร็จ! ดีลเสร็จสมบูรณ์');
+			toast.success('On-site confirmation successful! Deal completed.');
 			showScan = false;
 		} catch (e: any) {
-			alert(e?.message || 'ยืนยันไม่สำเร็จ');
+			toast.error(e?.message || 'Confirmation failed');
 		}
 	}
 
@@ -170,22 +170,22 @@
 </script>
 
 <section class="mx-auto max-w-4xl px-4 py-6">
-	<h1 class="text-xl font-bold mb-4">ออเดอร์ของฉัน</h1>
+	<h1 class="text-xl font-bold mb-4">My Order</h1>
 
 	{#if loading}
-		<div class="rounded border p-3">กำลังโหลด…</div>
+		<div class="rounded border p-3">Loading…</div>
 	{:else if err}
 		<div class="rounded border border-red-200 bg-red-50 p-3 text-red-700">{err}</div>
 	{:else if !offer}
-		<div class="text-sm text-neutral-500">ไม่พบออเดอร์</div>
+		<div class="text-sm text-neutral-500">Order not found</div>
 	{:else}
 		<article class="rounded-2xl border bg-white shadow p-4 space-y-3">
 			<header class="flex items-start justify-between gap-3">
 				<div>
 					<div class="text-lg font-semibold">{offer.listing.title}</div>
 					<div class="text-neutral-500 text-sm">
-						ผู้ขาย: <span class="font-medium">{offer.seller.name}</span>
-						• ราคา {THB(offer.listing.price)}
+						Seller: <span class="font-medium">{offer.seller.name}</span>
+						• Price {THB(offer.listing.price)}
 					</div>
 				</div>
 				<span class="h-6 inline-flex items-center rounded-full border px-2 text-xs">
@@ -195,59 +195,59 @@
 
 			<div class="grid sm:grid-cols-2 gap-3 text-sm">
 				<div>
-					<div class="text-neutral-500">สถานที่นัด</div>
+					<div class="text-neutral-500">Meeting Place</div>
 					<div class="font-medium">{offer.meetPlace}</div>
 				</div>
 				<div>
-					<div class="text-neutral-500">วัน–เวลา</div>
+					<div class="text-neutral-500">Date & Time</div>
 					<div class="font-medium">{new Date(offer.meetTime).toLocaleString()}</div>
 				</div>
 			</div>
 
 			{#if offer.note}
-				<div class="text-xs text-neutral-600">โน้ต: {offer.note}</div>
+				<div class="text-xs text-neutral-600">Note: {offer.note}</div>
 			{/if}
 			{#if offer.rejectReason}
-				<div class="text-xs text-red-600">เหตุผลปฏิเสธ: {offer.rejectReason}</div>
+				<div class="text-xs text-red-600">Rejection Reason: {offer.rejectReason}</div>
 			{/if}
 
-			<!-- อธิบายสถานะ -->
+			<!-- Status explanation -->
 			{#if offer.status === 'ACCEPTED'}
 				<div class="text-sm text-green-700">
-					ยอมรับแล้ว — กรุณาไปตามเวลานัด
+					Accepted — Please attend at
 					<span class="font-medium">{new Date(offer.meetTime).toLocaleString()}</span>
 					{#if meta?.isBuyer}
-						• รอผู้ขายแสดง QR เพื่อให้คุณสแกนยืนยันที่หน้างาน
+						• Wait for the seller to show the QR code for you to scan and confirm on-site
 						<div class="mt-3">
 							<button
-								class="rounded px-3 py-2 bg-brand text-white"
+								class="cursor-pointer rounded px-3 py-2 bg-brand text-white"
 								on:click={() => (showScan = true)}
 							>
-								สแกน/กรอกโค้ด เพื่อยืนยันหน้างาน
+								Scan/Enter code to confirm on-site
 							</button>
 						</div>
 					{/if}
 				</div>
 			{:else if offer.status === 'COMPLETED'}
-				<div class="text-sm text-green-700">จบดีลแล้ว</div>
+				<div class="text-sm text-green-700">Deal completed</div>
 			{:else if offer.status === 'REJECTED'}
-				<div class="text-sm text-neutral-600">ออเดอร์ถูกปฏิเสธ</div>
+				<div class="text-sm text-neutral-600">Order was rejected</div>
 			{:else}
 				<div class="text-sm text-neutral-600">
 					{#if meta?.yourTurn}
-						ถึงคิวคุณตอบกลับออเดอร์นี้
+						It's your turn to respond to this order
 					{:else}
-						รอฝ่ายตรงข้ามตอบกลับ…
+						Waiting for the other party to respond…
 					{/if}
 				</div>
 			{/if}
 
-			<!-- CTA: ใช้ meta จากเซิร์ฟเวอร์ -->
+			<!-- CTA: use meta from server -->
 			{#if meta}
 				<div class="flex flex-wrap gap-2 pt-2">
 					{#if meta.canReoffer}
 						<button class="rounded px-3 py-2 border" on:click={() => (showReoffer = true)}>
-							เสนอใหม่
+							Make a new offer
 						</button>
 					{/if}
 					{#if meta.canReject}
@@ -255,7 +255,7 @@
 							class="rounded px-3 py-2 border text-red-600"
 							on:click={() => (showReject = true)}
 						>
-							ปฏิเสธ
+							Reject
 						</button>
 					{/if}
 					{#if meta.canAccept}
@@ -264,15 +264,17 @@
 							on:click={accept}
 							disabled={working}
 						>
-							ยอมรับ
+							Accept
 						</button>
 					{/if}
 				</div>
 			{/if}
 
-			<!-- แจ้งว่ามีโค้ดแล้ว -->
+			<!-- Notify that code is generated -->
 			{#if offer.status === 'ACCEPTED' && offer.qrToken}
-				<div class="mt-3 text-xs text-neutral-500">โค้ดสำหรับยืนยันหน้างานถูกสร้างแล้ว</div>
+				<div class="mt-3 text-xs text-neutral-500">
+					The code for on-site confirmation has been generated
+				</div>
 			{/if}
 		</article>
 	{/if}
@@ -282,14 +284,20 @@
 {#if showReject}
 	<div class="fixed inset-0 bg-black/30 z-50 flex items-center justify-center p-4">
 		<div class="w-[min(92vw,520px)] rounded-xl bg-white p-4 border shadow">
-			<div class="text-lg font-semibold mb-2">ปฏิเสธออเดอร์นี้</div>
-			<label class="block text-sm mb-1">เหตุผล (ไม่บังคับ)</label>
-			<textarea rows="4" class="w-full rounded border px-3 py-2" bind:value={rejectReason} />
+			<div class="text-lg font-semibold mb-2">Reject this order</div>
+			<label class="block text-sm mb-1" for="reject-reason">Reason (optional)</label>
+			<textarea
+				id="reject-reason"
+				rows="4"
+				class="w-full rounded border px-3 py-2"
+				bind:value={rejectReason}
+			></textarea>
+
 			<div class="mt-3 flex justify-end gap-2">
 				<button class="rounded px-3 py-2 border" on:click={() => (showReject = false)}
-					>ยกเลิก</button
+					>Cancel</button
 				>
-				<button class="rounded px-3 py-2 bg-brand text-white" on:click={doReject}>ยืนยัน</button>
+				<button class="rounded px-3 py-2 bg-brand text-white" on:click={doReject}>Confirm</button>
 			</div>
 		</div>
 	</div>
@@ -299,37 +307,37 @@
 {#if showReoffer}
 	<div class="fixed inset-0 bg-black/30 z-50 flex items-center justify-center p-4">
 		<div class="w-[min(92vw,560px)] rounded-xl bg-white p-4 border shadow">
-			<div class="text-lg font-semibold mb-2">เสนอวัน–สถานที่ใหม่</div>
+			<div class="text-lg font-semibold mb-2">Propose new date & place</div>
 			<div class="grid sm:grid-cols-2 gap-3">
 				<div>
-					<label class="block text-sm mb-1">สถานที่นัด</label>
-					<PlaceSelect bind:value={reMeetPlace} required allowCustom />
+					<label class="block text-sm mb-1">
+						Meeting Place
+						<PlaceSelect bind:value={reMeetPlace} required allowCustom />
+					</label>
 				</div>
 				<div>
-					<label class="block text-sm mb-1">เวลานัด</label>
+					<label class="block text-sm mb-1" for="re-meet-time">Meeting Time</label>
 					<input
+						id="re-meet-time"
 						type="datetime-local"
 						class="w-full rounded border px-3 py-2"
 						bind:value={reMeetTime}
-						min={minDT}
-						on:focus={() => (minDT = minLocalDateTimeString(5))}
-						on:click={() => (minDT = minLocalDateTimeString(5))}
 					/>
 				</div>
 			</div>
 			<div class="mt-3 flex justify-end gap-2">
 				<button class="rounded px-3 py-2 border" on:click={() => (showReoffer = false)}
-					>ยกเลิก</button
+					>Cancel</button
 				>
 				<button class="rounded px-3 py-2 bg-brand text-white" on:click={doReoffer}
-					>ส่งข้อเสนอใหม่</button
+					>Send new offer</button
 				>
 			</div>
 		</div>
 	</div>
 {/if}
 
-<!-- โมดัลสแกน/กรอกโค้ด -->
+<!-- Scan/enter code modal -->
 <QrScanModal
 	open={showScan}
 	onClose={() => (showScan = false)}

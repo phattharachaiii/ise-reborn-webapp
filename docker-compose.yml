@@ -1,0 +1,78 @@
+# docker-compose.yml
+services:
+  # ---------- Postgres ----------
+  db:
+    image: postgres:16-alpine
+    container_name: app_db
+    restart: unless-stopped
+    env_file: [ ./.env ]
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-myuser}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-mypassword}
+      POSTGRES_DB: ${POSTGRES_DB:-mydb}
+    ports: ["5432:5432"]
+    volumes:
+      - db_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL","pg_isready -U ${POSTGRES_USER:-myuser} -d ${POSTGRES_DB:-mydb} -h 127.0.0.1"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+    networks: [ appnet ]
+
+  # ---------- Backend (Next.js + Prisma) ----------
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: app_backend
+    restart: unless-stopped
+    depends_on:
+      db:
+        condition: service_healthy
+    env_file: [ ./.env ]
+    environment:
+      DATABASE_URL: postgresql://${POSTGRES_USER:-myuser}:${POSTGRES_PASSWORD:-mypassword}@db:5432/${POSTGRES_DB:-mydb}?schema=public
+      NODE_ENV: production
+      FE_ORIGIN: ${FE_ORIGIN:-http://localhost:5173}
+      CLOUDINARY_CLOUD_NAME: ${CLOUDINARY_CLOUD_NAME:-}
+      CLOUDINARY_API_KEY: ${CLOUDINARY_API_KEY:-}
+      CLOUDINARY_API_SECRET: ${CLOUDINARY_API_SECRET:-}
+      CLOUDINARY_UPLOAD_PRESET: ${CLOUDINARY_UPLOAD_PRESET:-}
+      JWT_SECRET: ${JWT_SECRET:-change_this_in_.env}
+      ALLOWED_EMAIL_DOMAINS: ${ALLOWED_EMAIL_DOMAINS:-kmitl.ac.th}
+    ports:
+    - "3000:3000"
+    - "5555:5555"
+    networks: [ appnet ]
+
+  # ---------- Frontend (SvelteKit + Tailwind) ----------
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+      # ถ้าต้องส่ง PUBLIC_* ตอน build (กรณีใช้ vite/preview) ใส่แบบนี้:
+      # args:
+      #   PUBLIC_BACKEND_ORIGIN: ${PUBLIC_BACKEND_ORIGIN:-http://localhost:3000}
+      #   PUBLIC_CLOUDINARY_CLOUD_NAME: ${PUBLIC_CLOUDINARY_CLOUD_NAME:-}
+      #   PUBLIC_CLOUDINARY_UPLOAD_PRESET: ${PUBLIC_CLOUDINARY_UPLOAD_PRESET:-}
+    container_name: app_frontend
+    restart: unless-stopped
+    depends_on: [ backend ]
+    env_file: [ ./.env ]
+    environment:
+      NODE_ENV: production
+      PORT: 5173
+      HOST: 0.0.0.0
+      PUBLIC_BACKEND_ORIGIN: ${PUBLIC_BACKEND_ORIGIN:-http://localhost:3000}
+      PUBLIC_CLOUDINARY_CLOUD_NAME: ${PUBLIC_CLOUDINARY_CLOUD_NAME:-}
+      PUBLIC_CLOUDINARY_UPLOAD_PRESET: ${PUBLIC_CLOUDINARY_UPLOAD_PRESET:-}
+    ports: ["5173:5173"]
+    networks: [ appnet ]
+
+volumes:
+  db_data:
+
+networks:
+  appnet:
+    driver: bridge

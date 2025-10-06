@@ -1,25 +1,49 @@
 // app/api/offers/[id]/confirm/route.ts
+import type { NextRequest } from 'next/server';
 import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { getUserFromRequest } from '@/lib/auth';
 
+export const runtime = 'nodejs';
+export const dynamic = 'force-dynamic';
+
 const FE_ORIGIN = process.env.FE_ORIGIN || 'http://localhost:5173';
-const withCORS = (res: NextResponse) => { /* ... */ return res; };
 
-type Params = { params: { id: string } };
+function withCORS(res: NextResponse, methods: string[] = ['POST']) {
+    res.headers.set('Access-Control-Allow-Origin', FE_ORIGIN);
+    res.headers.set('Access-Control-Allow-Credentials', 'true');
+    res.headers.set('Access-Control-Allow-Methods', [...methods, 'OPTIONS'].join(','));
+    res.headers.set('Access-Control-Allow-Headers', 'Content-Type, Authorization');
+    res.headers.set('Vary', 'Origin');
+    res.headers.set('Cache-Control', 'no-store');
+    return res;
+}
 
-export async function POST(req: Request, { params }: Params) {
+export async function OPTIONS() {
+    return withCORS(new NextResponse(null, { status: 204 }));
+}
+
+// app/api/offers/[id]/confirm/route.ts
+
+// ...import ต่าง ๆ เหมือนเดิม...
+
+export async function POST(req: Request, context: any) {
+    // ดึง id จาก params แบบ cast ภายใน
+    const { id } = (context as { params: { id: string } }).params;
+
     const me = await getUserFromRequest(req).catch(() => null);
     if (!me) return withCORS(NextResponse.json({ message: 'UNAUTHORIZED' }, { status: 401 }));
 
-    const body = await req.json().catch(() => ({}));
-    const { token } = body as { token?: string };
+    const body = await req.json().catch(() => ({} as any));
+    const token = String((body as any)?.token || '').trim();
     if (!token) return withCORS(NextResponse.json({ message: 'MISSING_TOKEN' }, { status: 400 }));
 
-    const offer = await prisma.offer.findUnique({ where: { id: params.id }, include: { listing: true } });
+    const offer = await prisma.offer.findUnique({
+        where: { id },
+        include: { listing: true }
+    });
     if (!offer) return withCORS(NextResponse.json({ message: 'NOT_FOUND' }, { status: 404 }));
 
-    // ต้องเป็นผู้ซื้อ และอยู่สถานะ ACCEPTED
     if (offer.buyerId !== me.id) return withCORS(NextResponse.json({ message: 'FORBIDDEN' }, { status: 403 }));
     if (offer.status !== 'ACCEPTED') return withCORS(NextResponse.json({ message: 'INVALID_STATE' }, { status: 400 }));
     if (offer.qrToken !== token) return withCORS(NextResponse.json({ message: 'INVALID_TOKEN' }, { status: 400 }));
@@ -42,11 +66,15 @@ export async function POST(req: Request, { params }: Params) {
             type: 'OFFER_COMPLETED',
             offerId: offer.id,
             listingId: offer.listingId,
-            title: `ออเดอร์สำเร็จ`,
+            title: 'ออเดอร์สำเร็จ',
             message: `${offer.listing.title} ถูกปิดการขายแล้ว`
         }
     });
-    await prisma.$executeRawUnsafe(`SELECT pg_notify('noti', json_build_object('userId','${offer.sellerId}','event','OFFER_COMPLETED')::text)`);
+
+    await prisma.$executeRawUnsafe(
+        `SELECT pg_notify('noti', json_build_object('userId','${offer.sellerId}','event','OFFER_COMPLETED')::text)`
+    );
 
     return withCORS(NextResponse.json({ offer: updated }));
 }
+

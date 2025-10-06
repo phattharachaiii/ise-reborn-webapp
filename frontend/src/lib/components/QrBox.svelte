@@ -1,6 +1,7 @@
 <!-- src/lib/components/QrBox.svelte -->
 <script lang="ts">
-	/** tokenUrl: ลิงก์ที่ฝั่งผู้ซื้อจะเปิด (มี token อยู่ในพารามิเตอร์) */
+	/** tokenUrl: The link that the buyer will open (token is in the parameter) */
+	import { toast } from "$lib/stores/toast";
 	export let tokenUrl: string;
 
 	let show = false;
@@ -14,16 +15,16 @@
 		if (!tokenUrl) return;
 		try {
 			await navigator.clipboard.writeText(tokenUrl);
-			alert('คัดลอกลิงก์แล้ว');
+			toast.success('Copied to clipboard');
 		} catch {
-			alert('คัดลอกไม่สำเร็จ');
+			toast.error('Failed to copy link');
 		}
 	}
 </script>
 
 <div class="rounded-lg border bg-white p-3 shadow-sm w-[min(92vw,360px)]">
 	<div class="flex items-center justify-between gap-2">
-		<div class="text-sm font-semibold">QR สำหรับผู้ซื้อ</div>
+		<div class="text-sm font-semibold">QR for Buyer</div>
 		<div class="flex items-center gap-2">
 			<button
 				type="button"
@@ -31,22 +32,22 @@
 				on:click={() => (show = !show)}
 				aria-pressed={show}
 			>
-				{show ? 'ซ่อน' : 'แสดง'}
+				{show ? 'Hide' : 'Show'}
 			</button>
 			<button type="button" class="rounded px-2 py-1 text-xs border" on:click={copyLink}>
-				คัดลอกลิงก์
+				Copy Link
 			</button>
 			<button type="button" class="rounded px-2 py-1 text-xs border" on:click={openNew}>
-				เปิดลิงก์
+				Open Link
 			</button>
 			<button
 				type="button"
 				class="rounded px-2 py-1 text-xs bg-black text-white disabled:opacity-50"
 				on:click={() => (fullscreen = true)}
 				disabled={!show}
-				title={!show ? 'กดแสดง QR ก่อน' : 'เปิดแบบเต็มหน้าจอ'}
+				title={!show ? 'Press “Show” to reveal QR' : 'Open in full screen'}
 			>
-				เต็มจอ
+				Full Screen
 			</button>
 		</div>
 	</div>
@@ -62,7 +63,7 @@
 			/>
 			{#if !show}
 				<div class="overlay">
-					<div class="hint">แตะ “แสดง” เพื่อเปิดเผย</div>
+					<div class="hint">Tap “Show” to reveal</div>
 				</div>
 			{/if}
 		</div>
@@ -74,9 +75,9 @@
 		<div class="fixed inset-0 z-[1000] flex flex-col bg-black/95">
 			<div class="flex items-center justify-between p-3">
 				<button class="rounded bg-white px-3 py-2 text-sm" on:click={() => (fullscreen = false)}>
-					ปิด
+					Close
 				</button>
-				<div class="text-white text-sm opacity-80">QR สำหรับยืนยันหน้างาน</div>
+				<div class="text-white text-sm opacity-80">QR for On-Site Verification</div>
 				<div class="w-[64px]"></div>
 			</div>
 			<div class="flex-1 grid place-items-center p-4">
@@ -88,8 +89,8 @@
 				/>
 			</div>
 			<div class="p-3 grid grid-cols-2 gap-2">
-				<button class="rounded bg-white py-2 text-sm" on:click={copyLink}>คัดลอกลิงก์</button>
-				<button class="rounded bg-white py-2 text-sm" on:click={openNew}>เปิดลิงก์</button>
+				<button class="rounded bg-white py-2 text-sm" on:click={copyLink}>Copy Link</button>
+				<button class="rounded bg-white py-2 text-sm" on:click={openNew}>Open Link</button>
 			</div>
 		</div>
 	{/if}

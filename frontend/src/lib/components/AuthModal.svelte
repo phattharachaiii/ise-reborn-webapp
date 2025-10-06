@@ -3,7 +3,7 @@
 	import { tick } from 'svelte';
 	import { auth as authStore, openAuth, closeAuth, setAuth } from '$lib/stores/auth';
 	import { apiJson } from '$lib/api/client';
-
+	import { toast } from '$lib/stores/toast';
 	const auth = authStore;
 
 	// form states
@@ -15,7 +15,7 @@
 	let loading = false;
 	let errorMsg = '';
 
-	// ✅ ประกาศก่อน แล้ว reactive ทีหลัง (ห้ามใส่ type ใน $:)
+	// ✅ Declare first, then reactive (do not add type in $:)
 	let open = false;
 	let mode: 'login' | 'register' = 'login';
 	$: open = $auth.openAuth;
@@ -33,11 +33,11 @@
 		openAuth(next);
 	}
 	function getErrMsg(e: any) {
-		if (e && typeof e === 'object') return e.message || 'เกิดข้อผิดพลาด';
-		return 'เชื่อมต่อเซิร์ฟเวอร์ไม่ได้';
+		if (e && typeof e === 'object') return e.message || 'An error occurred';
+		return 'Cannot connect to server';
 	}
 
-	// password policy (client hint; server ต้องตรวจซ้ำ)
+	// password policy (client hint; server must also check)
 	const pwRules = {
 		len: (s: string) => s.length >= 8,
 		digit: (s: string) => /[0-9]/.test(s),
@@ -75,15 +75,15 @@
 	async function submitRegister() {
 		errorMsg = '';
 		if (!email.trim()) {
-			errorMsg = 'กรอกอีเมลก่อน';
+			errorMsg = 'Enter your email';
 			return;
 		}
 		if (!pwOk) {
-			errorMsg = 'รหัสผ่านยังไม่ตรงตามเงื่อนไข';
+			errorMsg = 'Password does not meet requirements';
 			return;
 		}
 		if (!samePw) {
-			errorMsg = 'รหัสผ่านยืนยันไม่ตรงกัน';
+			errorMsg = 'Passwords do not match';
 			return;
 		}
 
@@ -98,7 +98,7 @@
 					passwordConfirm: confirm.trim()
 				})
 			});
-			alert(`สมัครสำเร็จ! อีเมลของคุณคือ: ${data.user.email}`);
+			toast.success('Registered successfully!', `Your email is: ${data.user.email}`);
 			switchMode('login');
 			await tick();
 		} catch (e) {
@@ -114,6 +114,8 @@
 </script>
 
 {#if open}
+	<!-- svelte-ignore a11y_click_events_have_key_events -->
+	<!-- svelte-ignore a11y_no_static_element_interactions -->
 	<div
 		class="fixed inset-0 z-50 grid place-items-center bg-black/60"
 		on:click={() => {
@@ -129,14 +131,17 @@
 			on:click|stopPropagation
 		>
 			<div class="flex items-center justify-between mb-4">
-				<h3 class="text-xl font-bold">{mode === 'login' ? 'เข้าสู่ระบบ' : 'สมัครสมาชิก'}</h3>
+				<h3 class="text-xl font-bold">{mode === 'login' ? 'Login' : 'Register'}</h3>
 				<button
-					class="text-2xl -mt-2 cursor-pointer hover:text-red-600 transition"
+					class="text-sm -mt-2 cursor-pointer px-2 py-1 text-sm font-semibold text-gray-600 hover:text-white
+         bg-gray-100 hover:bg-red-500 
+         rounded-full shadow-sm transition-all duration-200
+         hover:scale-105 active:scale-95 "
 					on:click={() => {
 						closeAuth();
 						resetFields();
 					}}
-					aria-label="close">&times;</button
+					aria-label="close">✕</button
 				>
 			</div>
 
@@ -149,7 +154,7 @@
 			{#if mode === 'login'}
 				<form on:submit|preventDefault={submitLogin} class="space-y-4">
 					<div>
-						<label class="block mb-1" for="login-email">อีเมล</label>
+						<label class="block mb-1" for="login-email">Email</label>
 						<input
 							id="login-email"
 							type="email"
@@ -162,7 +167,7 @@
 						/>
 					</div>
 					<div>
-						<label class="block mb-1" for="login-password">รหัสผ่าน</label>
+						<label class="block mb-1" for="login-password">Password</label>
 						<input
 							id="login-password"
 							type="password"
@@ -176,22 +181,22 @@
 						class="cursor-pointer w-full rounded bg-brand text-white py-2 hover:bg-brand-2 disabled:opacity-60"
 						disabled={loading}
 					>
-						{loading ? 'กำลังเข้าสู่ระบบ...' : 'เข้าสู่ระบบ'}
+						{loading ? 'Logging in...' : 'Login'}
 					</button>
 					<p class="text-center text-sm">
-						ยังไม่มีบัญชี?
+						Don't have an account?
 						<a class="text-brand" href="#" on:click|preventDefault={() => switchMode('register')}
-							>สมัครสมาชิกที่นี่</a
+							>Register here</a
 						>
 					</p>
 					<p class="text-[11px] text-neutral-500 text-center">
-						(ระบบอาจจำกัดโดเมนอีเมลที่อนุญาต เช่น <code>kmitl.ac.th</code> — ถ้าไม่ผ่าน ระบบจะแจ้งเตือน)
+						(The system may restrict allowed email domains, e.g., <code>kmitl.ac.th</code> — if not accepted, you will be notified.)
 					</p>
 				</form>
 			{:else}
 				<form on:submit|preventDefault={submitRegister} class="space-y-4">
 					<div>
-						<label class="block mb-1" for="register-email">อีเมลมหาวิทยาลัย</label>
+						<label class="block mb-1" for="register-email">University Email</label>
 						<input
 							id="register-email"
 							type="email"
@@ -203,23 +208,23 @@
 							required
 						/>
 						<p class="mt-1 text-[11px] text-neutral-500">
-							ใช้อีเมลนักศึกษาหรือบุคลากร (โดเมนที่อนุญาตถูกกำหนดที่ฝั่งระบบ)
+							Use your student or staff email (allowed domains are set by the system).
 						</p>
 					</div>
 
 					<div>
-						<label class="block mb-1" for="register-name">ชื่อที่แสดง (ไม่บังคับ)</label>
+						<label class="block mb-1" for="register-name">Display Name (optional)</label>
 						<input
 							id="register-name"
 							bind:value={name}
-							placeholder="เว้นว่างได้"
+							placeholder="Leave blank if not applicable"
 							class="w-full rounded border px-3 py-2"
 							autocomplete="nickname"
 						/>
 					</div>
 
 					<div>
-						<label class="block mb-1" for="register-password">สร้างรหัสผ่าน</label>
+						<label class="block mb-1" for="register-password">Create Password</label>
 						<input
 							id="register-password"
 							type="password"
@@ -230,25 +235,25 @@
 						/>
 						<ul class="mt-2 space-y-1 text-[12px]">
 							<li class={pwRules.len(password) ? 'text-green-700' : 'text-neutral-500'}>
-								อย่างน้อย 8 ตัวอักษร
+								At least 8 characters
 							</li>
 							<li class={pwRules.digit(password) ? 'text-green-700' : 'text-neutral-500'}>
-								ตัวเลข ≥ 1 ตัว
+								At least 1 digit
 							</li>
 							<li class={pwRules.upper(password) ? 'text-green-700' : 'text-neutral-500'}>
-								ตัวพิมพ์ใหญ่ ≥ 1 ตัว
+								At least 1 uppercase letter
 							</li>
 							<li class={pwRules.special(password) ? 'text-green-700' : 'text-neutral-500'}>
-								อักขระพิเศษ ≥ 1 ตัว
+								At least 1 special character
 							</li>
 							<li class={pwRules.nospace(password) ? 'text-green-700' : 'text-neutral-500'}>
-								ห้ามมีช่องว่าง
+								No spaces allowed
 							</li>
 						</ul>
 					</div>
 
 					<div>
-						<label class="block mb-1" for="register-confirm">ยืนยันรหัสผ่าน</label>
+						<label class="block mb-1" for="register-confirm">Confirm Password</label>
 						<input
 							id="register-confirm"
 							type="password"
@@ -259,7 +264,7 @@
 						/>
 						{#if confirm.length > 0}
 							<div class="mt-1 text-[12px] {samePw ? 'text-green-700' : 'text-red-700'}">
-								{samePw ? 'รหัสผ่านตรงกัน' : 'รหัสผ่านไม่ตรงกัน'}
+								{samePw ? 'Passwords match' : 'Passwords do not match'}
 							</div>
 						{/if}
 					</div>
@@ -268,12 +273,12 @@
 						class="cursor-pointer w-full rounded bg-brand text-white py-2 hover:bg-brand-2 disabled:opacity-60"
 						disabled={loading}
 					>
-						{loading ? 'กำลังสมัครสมาชิก...' : 'สมัครสมาชิก'}
+						{loading ? 'Registering...' : 'Register'}
 					</button>
 					<p class="text-center text-sm">
-						มีบัญชีอยู่แล้ว?
+						Already have an account?
 						<a class="text-brand" href="#" on:click|preventDefault={() => switchMode('login')}
-							>เข้าสู่ระบบที่นี่</a
+							>Login here</a
 						>
 					</p>
 				</form>

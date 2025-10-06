@@ -180,11 +180,6 @@
 			></div>
 
 			<div class="absolute left-3 top-3 flex items-center gap-2">
-				{#if isBoosted}
-					<span class="rounded-full bg-orange-500 text-white text-[11px] px-2 py-0.5 shadow-sm"
-						>โปรโมท</span
-					>
-				{/if}
 				{#if status}
 					<span
 						class={`rounded-full border text-[11px] px-2 py-0.5 backdrop-blur-sm ${STATUS_STYLE[status] || 'bg-white/90 text-neutral-700 border-neutral-200'}`}

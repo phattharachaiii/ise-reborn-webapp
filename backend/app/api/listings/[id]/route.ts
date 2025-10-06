@@ -37,7 +37,7 @@ export async function GET(req: Request, { params }: Ctx) {
     // ควบคุมการมองเห็น meetPlace:
     // - เจ้าของหรือแอดมิน เห็นแน่นอน
     // - ผู้ใช้ที่ล็อกอินทั่วไป “เห็น” (ผู้ซื้อเท่านั้น) — ผู้เยี่ยมชมที่ไม่ล็อกอิน ไม่เห็น
-    let meetPlace: string | null = listing.meetPlace ?? null;
+    let meetPlace: string | null = null;
     const isOwner = !!(me && me.id === listing.sellerId);
     const isAdmin = me?.role === 'ADMIN';
     const isLoggedInBuyer = !!(me && !isOwner); // อนุมานว่าเป็นผู้ซื้อที่ล็อกอิน

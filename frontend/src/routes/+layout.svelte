@@ -6,7 +6,6 @@
 	import AuthModal from '$lib/components/AuthModal.svelte';
 	import { refreshMe } from '$lib/stores/auth';
 	import Toaster from '$lib/components/Toaster.svelte';
-	// ดึง user สด ๆ จาก backend ทุกครั้งที่เปิด/รีเฟรชแอป
 	onMount(() => {
 		refreshMe();
 	});

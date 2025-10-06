@@ -25,9 +25,9 @@
 	type TabKey = 'all' | 'active' | 'sold';
 	let tab: TabKey = 'all';
 	const tabs: { key: TabKey; label: string }[] = [
-		{ key: 'all', label: 'ทั้งหมด' },
-		{ key: 'active', label: 'ขายอยู่' },
-		{ key: 'sold', label: 'จบการขาย' }
+		{ key: 'all', label: 'All' },
+		{ key: 'active', label: 'Active' },
+		{ key: 'sold', label: 'Sold' }
 	];
 
 	// ---------- loaders ----------
@@ -67,7 +67,7 @@
 			const data = await apiJson<{ items: Listing[] }>(url);
 			items = data.items ?? [];
 		} catch (e: any) {
-			error = e?.message || 'โหลดรายการไม่สำเร็จ';
+			error = e?.message || 'Failed to load items';
 		} finally {
 			loading = false;
 		}
@@ -94,8 +94,8 @@
 		Promise.all([loadStats(), loadItems(tab)]);
 	}
 
-	// ---------- UI safety net: filter ฝั่ง FE + บังคับ re-mount ----------
-	// กรองตามแท็บ เผื่อ BE ยังไม่กรอง
+	// ---------- UI safety net: filter on FE + force re-mount ----------
+	// Filter by tab in case BE does not filter
 	$: displayed =
 		tab === 'active'
 			? items.filter((i) => String(i.status).toUpperCase() === 'ACTIVE')
@@ -108,8 +108,8 @@
 	<!-- Header -->
 	<div class="flex items-center justify-between gap-3">
 		<div>
-			<h1 class="text-2xl font-bold">สินค้าของฉัน</h1>
-			<p class="text-sm text-neutral-500">จัดการโพสต์ที่คุณลงขาย และประวัติการขายของคุณ</p>
+			<h1 class="text-2xl font-bold">My Products</h1>
+			<p class="text-sm text-neutral-500">Manage your posted products and your sales history.</p>
 		</div>
 
 		<div class="flex items-center gap-2">
@@ -118,13 +118,13 @@
 				class="cursor-pointer rounded-full border border-surface px-4 py-2 text-sm hover:bg-neutral-50"
 				on:click={refresh}
 			>
-				รีเฟรช
+				Refresh
 			</button>
 			<a
 				href="/post"
 				class="inline-flex items-center gap-2 rounded-full bg-brand text-white px-4 py-2 text-sm hover:bg-brand-2 transition"
 			>
-				+ ลงขายสินค้า
+				+ Post Product
 			</a>
 		</div>
 	</div>
@@ -174,21 +174,21 @@
 		</div>
 	{:else if displayed.length === 0}
 		<div class="rounded-xl border border-dashed border-surface bg-white p-8 text-center space-y-3">
-			<div class="text-lg font-semibold">ยังไม่มีรายการในแท็บนี้</div>
+			<div class="text-lg font-semibold">No items in this tab yet</div>
 			<p class="text-sm text-neutral-500">
-				เริ่มต้นลงขายของชิ้นแรกของคุณ หรือเช็คแท็บอื่น ๆ ได้เลย
+				Start by posting your first product or check other tabs.
 			</p>
 			<a
 				href="/post"
 				class="inline-flex items-center gap-2 rounded-full bg-brand text-white px-4 py-2 text-sm hover:bg-brand-2 transition"
 			>
-				+ ลงขายสินค้า
+				+ Post Product
 			</a>
 		</div>
 	{:else}
 		<div class="bg-white rounded-xl border border-surface p-4">
 			{#key tab}
-				<!-- บังคับ re-mount ทุกครั้งที่เปลี่ยนแท็บ -->
+				<!-- Force re-mount every time the tab changes -->
 				<ProductGrid items={displayed} />
 			{/key}
 		</div>

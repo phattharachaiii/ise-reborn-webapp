@@ -29,7 +29,7 @@
 	let status = '';
 	let q = '';
 
-	// ป้ายสถานะ (ข้อความ)
+	// Status labels (text)
 	const STATUS_LABEL: Record<string, string> = {
 		REQUESTED: 'WAITING',
 		REOFFER: 'RE-OFFER',
@@ -39,7 +39,7 @@
 		CANCELLED: 'CANCELLED'
 	};
 
-	// ป้ายสถานะ (สีธีม)
+	// Status badge (theme color)
 	const statusBadge = (s: OfferLite['status']) => {
 		switch (s) {
 			case 'REQUESTED':
@@ -58,7 +58,7 @@
 		}
 	};
 
-	// แท็บ role (active=no hover/cursor-pointer)
+	// Role tab (active=no hover/cursor-pointer)
 	const tabClass = (active: boolean) =>
 		`px-3 py-1.5 rounded-md text-sm focus:outline-none focus-visible:ring-2 focus-visible:ring-orange-300 ` +
 		(active
@@ -88,7 +88,7 @@
 			items = data.items || [];
 		} catch (e: any) {
 			if (e?.name === 'AbortError') return;
-			error = e?.message || 'โหลดรายการไม่สำเร็จ';
+			error = e?.message || 'Failed to load offers';
 			items = [];
 		} finally {
 			loading = false;
@@ -135,8 +135,8 @@
 	<!-- Header -->
 	<div class="flex items-center justify-between gap-3">
 		<div>
-			<h1 class="text-2xl font-bold">ข้อเสนอของฉัน</h1>
-			<p class="text-sm text-neutral-600">รวมข้อเสนอทั้งฝั่งที่ซื้อและขาย</p>
+			<h1 class="text-2xl font-bold">My Offers</h1>
+			<p class="text-sm text-neutral-600">All offers as both buyer and seller</p>
 		</div>
 	</div>
 
@@ -148,17 +148,17 @@
 				<button
 					class={tabClass(role === 'all')}
 					aria-pressed={role === 'all'}
-					on:click={() => (role = 'all')}>ทั้งหมด</button
+					on:click={() => (role = 'all')}>All</button
 				>
 				<button
 					class={tabClass(role === 'buyer')}
 					aria-pressed={role === 'buyer'}
-					on:click={() => (role = 'buyer')}>ฝั่งที่ซื้อ</button
+					on:click={() => (role = 'buyer')}>Buyer</button
 				>
 				<button
 					class={tabClass(role === 'seller')}
 					aria-pressed={role === 'seller'}
-					on:click={() => (role = 'seller')}>ฝั่งที่ขาย</button
+					on:click={() => (role = 'seller')}>Seller</button
 				>
 			</div>
 
@@ -166,7 +166,7 @@
 			<select
 				class="rounded border border-surface px-3 py-1.5 text-sm bg-surface-white focus:outline-none focus-visible:ring-2 focus-visible:ring-orange-300"
 				bind:value={status}
-				aria-label="กรองตามสถานะ"
+				aria-label="Filter by status"
 			>
 				<option value="">ALL</option>
 				<option value="REQUESTED">WAITING</option>
@@ -181,14 +181,14 @@
 			<div class="flex-1 min-w-[160px] flex items-center gap-2">
 				<input
 					class="flex-1 rounded border border-surface px-3 py-1.5 text-sm bg-surface-white focus:outline-none focus-visible:ring-2 focus-visible:ring-orange-300"
-					placeholder="ค้นหาจากสินค้า/ชื่อคู่สนทนา/สถานที่"
+					placeholder="Search by product/counterpart/location"
 					bind:value={q}
 				/>
 				<button
 					class="rounded border border-surface px-3 py-1.5 text-sm hover:bg-surface-light"
 					on:click={load}
 				>
-					ค้นหา
+					Search
 				</button>
 			</div>
 		</div>
@@ -210,8 +210,8 @@
 		<div
 			class="rounded-xl border border-dashed border-surface bg-surface-white p-8 text-center shadow-card"
 		>
-			<div class="text-lg font-semibold">ยังไม่มีข้อเสนอ</div>
-			<div class="text-sm text-neutral-600">เมื่อมีการติดต่อซื้อ-ขาย จะปรากฏที่นี่</div>
+			<div class="text-lg font-semibold">No offers yet</div>
+			<div class="text-sm text-neutral-600">Offers will appear here when you start buying or selling</div>
 		</div>
 	{:else}
 		<div class="space-y-3">
@@ -219,7 +219,7 @@
 				<article
 					class="rounded-lg border border-surface p-3 bg-surface-white flex flex-col gap-3 shadow-card"
 				>
-					<!-- แถวบน: ชื่อสินค้า + สถานะ + บทบาทเรา -->
+					<!-- Top row: product name + status + my role -->
 					<div class="flex items-start gap-2">
 						<div class="font-semibold leading-snug line-clamp-2">{o.listing.title}</div>
 						<span
@@ -229,48 +229,42 @@
 						</span>
 					</div>
 
-					<!-- รายละเอียด: คู่สนทนา + ราคา + นัด -->
+					<!-- Details: counterpart + price + meeting -->
 					<div class="grid sm:grid-cols-2 gap-2 text-sm">
 						<div>
 							<div class="text-neutral-500">
-								คู่สนทนา ({o.myRole === 'BUYER' ? 'ผู้ขาย' : 'ผู้ซื้อ'})
+								Counterpart ({o.myRole === 'BUYER' ? 'Seller' : 'Buyer'})
 							</div>
 							<div class="font-medium">{o.counterpart?.name}</div>
 						</div>
 						<div>
-							<div class="text-neutral-500">ราคา</div>
+							<div class="text-neutral-500">Price</div>
 							<div class="font-medium text-brand">{THB(o.listing.price)}</div>
 						</div>
 						<div>
-							<div class="text-neutral-500">สถานที่นัด</div>
+							<div class="text-neutral-500">Meeting place</div>
 							<div class="font-medium">{o.meetPlace}</div>
 						</div>
 						<div>
-							<div class="text-neutral-500">วัน–เวลา</div>
+							<div class="text-neutral-500">Date & Time</div>
 							<div class="font-medium">{formatDT(o.meetTime)}</div>
 						</div>
 					</div>
 
 					{#if o.note}
-						<div class="text-[12px] text-neutral-600">โน้ต: {o.note}</div>
+						<div class="text-[12px] text-neutral-600">Note: {o.note}</div>
 					{/if}
 					{#if o.rejectReason}
-						<div class="text-[12px] text-red-600">เหตุผลปฏิเสธ: {o.rejectReason}</div>
+						<div class="text-[12px] text-red-600">Rejection reason: {o.rejectReason}</div>
 					{/if}
 
 					<!-- CTA -->
 					<div class="flex flex-wrap gap-2 pt-1">
 						<button
-							class="rounded px-3 py-1.5 border border-surface text-sm hover:bg-surface-light"
+							class="cursor-pointer rounded px-3 py-1.5 bg-brand border border-surface text-sm text-white font-semibold hover:bg-brand-h"
 							on:click={() => openOffer(o.id)}
 						>
-							เปิดดีล
-						</button>
-						<button
-							class="rounded px-3 py-1.5 border border-surface text-sm hover:bg-surface-light"
-							on:click={() => openListing(o.listing.id)}
-						>
-							ไปหน้าประกาศ
+							Enter
 						</button>
 					</div>
 				</article>
@@ -284,6 +278,7 @@
 		display: -webkit-box;
 		-webkit-box-orient: vertical;
 		-webkit-line-clamp: 2;
+		line-clamp: 2;
 		overflow: hidden;
 	}
 </style>

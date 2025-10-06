@@ -1,0 +1,13 @@
+node_modules
+.build
+.output
+dist
+build
+.git
+Dockerfile
+Dockerfile.*
+npm-debug.log
+*.local
+.env
+.vscode
+.svelte-kit

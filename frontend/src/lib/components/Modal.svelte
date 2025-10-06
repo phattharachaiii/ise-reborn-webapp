@@ -9,12 +9,12 @@
 	}
 
 	function handleBackdropKey(e: KeyboardEvent) {
-		// ปิดด้วย Esc เสมอ
+		// Always close with Esc
 		if (e.key === 'Escape') {
 			e.stopPropagation();
 			close();
 		}
-		// ถ้าโฟกัสอยู่ที่ backdrop แล้วกด Enter/Space ให้ปิด (จำลองคลิก)
+		// If focus is on backdrop and Enter/Space is pressed, close (simulate click)
 		if ((e.key === 'Enter' || e.key === ' ') && e.currentTarget === e.target) {
 			e.preventDefault();
 			close();
@@ -29,7 +29,7 @@
 		on:keydown={handleBackdropKey}
 		role="button"
 		tabindex="0"
-		aria-label="ปิดโมดัล (กด Esc เพื่อปิด)"
+		aria-label="Close modal (press Esc to close)"
 	>
 		<div class="w-[90%] max-w-lg rounded-lg bg-white p-6 shadow-lg">
 			<div class="flex items-center justify-between border-b border-surface pb-3 mb-4">
