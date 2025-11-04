@@ -5,10 +5,10 @@ import { buildMinimalSignedParams } from '@/lib/cloudinary';
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
 
-const PUBLIC_FRONTEND_ORIGIN = process.env.PUBLIC_FRONTEND_ORIGIN || 'http://localhost:5173';
+const FE_ORIGIN = process.env.FE_ORIGIN || 'http://localhost:5173';
 
 function withCORS(res: NextResponse, methods: string[]) {
-    res.headers.set('Access-Control-Allow-Origin', PUBLIC_FRONTEND_ORIGIN);
+    res.headers.set('Access-Control-Allow-Origin', FE_ORIGIN);
     res.headers.set('Access-Control-Allow-Credentials', 'true');
     res.headers.set('Access-Control-Allow-Methods', [...methods, 'OPTIONS'].join(','));
     // อนุญาต header ที่เราจะใช้จริง

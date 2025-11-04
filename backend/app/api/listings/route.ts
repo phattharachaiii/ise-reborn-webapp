@@ -15,13 +15,13 @@ import {
 export const runtime = 'nodejs';
 
 // ===== CORS / Config =====
-const PUBLIC_FRONTEND_ORIGIN = process.env.PUBLIC_FRONTEND_ORIGIN || 'http://localhost:5173';
+const FE_ORIGIN = process.env.FE_ORIGIN || 'http://localhost:5173';
 const BOOST_DAYS = parseInt(process.env.BOOST_DAYS || '7', 10);
 const MAX_ACTIVE_BOOSTS_PER_USER = parseInt(process.env.MAX_ACTIVE_BOOSTS_PER_USER || '10', 10);
 
 function withCORS(res: NextResponse, req?: Request, methods: string[] = ['GET', 'POST', 'OPTIONS']) {
   // allow single FE origin
-  res.headers.set('Access-Control-Allow-Origin', PUBLIC_FRONTEND_ORIGIN);
+  res.headers.set('Access-Control-Allow-Origin', FE_ORIGIN);
   res.headers.set('Vary', 'Origin');
 
   // allow cookies if needed

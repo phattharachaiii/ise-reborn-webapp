@@ -3,12 +3,12 @@ import { prisma } from '@/lib/prisma';
 import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
 
-const PUBLIC_FRONTEND_ORIGIN = process.env.PUBLIC_FRONTEND_ORIGIN || 'http://localhost:5173';
+const FE_ORIGIN = process.env.FE_ORIGIN || 'http://localhost:5173';
 const JWT_SECRET = process.env.JWT_SECRET || 'devsecret';
 const TOKEN_TTL_SEC = parseInt(process.env.JWT_TTL_SEC || '1209600', 10); // default 14 วัน
 
 const withCORS = (res: NextResponse) => {
-    res.headers.set('Access-Control-Allow-Origin', PUBLIC_FRONTEND_ORIGIN);
+    res.headers.set('Access-Control-Allow-Origin', FE_ORIGIN);
     res.headers.set('Access-Control-Allow-Headers', 'Content-Type, Authorization');
     res.headers.set('Access-Control-Allow-Methods', 'POST,OPTIONS');
     res.headers.set('Access-Control-Allow-Credentials', 'true');
@@ -58,7 +58,7 @@ export async function POST(req: Request) {
         res.cookies.set('auth_token', token, {
             httpOnly: true,
             sameSite: 'lax',
-            secure: PUBLIC_FRONTEND_ORIGIN.startsWith('https'),
+            secure: FE_ORIGIN.startsWith('https'),
             path: '/',
             maxAge: TOKEN_TTL_SEC,
         });
