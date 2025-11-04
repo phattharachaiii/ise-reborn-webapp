@@ -1,8 +1,9 @@
 // $lib/api/client.ts
 import { get } from 'svelte/store';
 import { auth } from '$lib/stores/auth';
+import { PUBLIC_BACKEND_ORIGIN } from '$env/static/public';
 
-const API_BASE = import.meta.env.PUBLIC_BACKEND_ORIGIN ?? 'http://localhost:3000';
+const API_BASE = PUBLIC_BACKEND_ORIGIN;
 
 function apiUrl(path: string) {
   if (!path) return API_BASE;
