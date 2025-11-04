@@ -1,187 +1,260 @@
-<!-- src/routes/account/purchases/+page.svelte -->
+<!-- src/routes/offers/+page.svelte -->
 <script lang="ts">
   import { onMount } from 'svelte';
+  import { page } from '$app/stores';
   import { apiJson } from '$lib/api/client';
+  import { goto } from '$app/navigation';
 
-  type Item = {
+  type OfferLite = {
     id: string;
-    updatedAt: string;
-    listing: { id: string; title: string; price: number; imageUrls: string[]; status: string };
-    seller: { id: string; name: string };
+    status: 'REQUESTED' | 'ACCEPTED' | 'REJECTED' | 'REOFFER' | 'COMPLETED' | 'CANCELLED';
     meetPlace: string;
     meetTime: string;
+    note?: string | null;
+    rejectReason?: string | null;
+    lastActor: 'BUYER' | 'SELLER';
+    updatedAt: string;
+    myRole: 'BUYER' | 'SELLER';
+    qrToken?: string | null;
+    listing: { id: string; title: string; price: number; imageUrls: string[]; status: string };
+    counterpart: { id: string; name: string; avatarUrl?: string | null };
   };
 
-  let items: Item[] = [];
-  let loading = true;
-  let err = '';
+  let loading = true, error = '';
+  let items: OfferLite[] = [];
 
-  onMount(load);
+  type RoleTab = 'all' | 'buyer' | 'seller';
+  let role: RoleTab = 'all';
+  let status = '';
+  let q = '';
 
+  // ---- UI helpers -----------------------------------------------------------
+  const STATUS_LABEL: Record<string, string> = {
+    REQUESTED: 'WAITING',
+    REOFFER: 'RE-OFFER',
+    ACCEPTED: 'ACCEPTED',
+    COMPLETED: 'COMPLETED',
+    REJECTED: 'REJECTED',
+    CANCELLED: 'CANCELLED'
+  };
+  const statusBadge = (s: OfferLite['status']) => {
+    switch (s) {
+      case 'REQUESTED':
+      case 'REOFFER':   return 'bg-surface-light text-text-base border-surface';
+      case 'ACCEPTED':  return 'bg-green-50 text-green-700 border-green-200';
+      case 'COMPLETED': return 'bg-brand/10 text-brand border-surface';
+      case 'REJECTED':  return 'bg-red-50 text-red-700 border-red-200';
+      case 'CANCELLED': return 'bg-neutral-100 text-neutral-600 border-surface';
+      default:          return 'bg-surface-light text-text-base border-surface';
+    }
+  };
+  const tabClass = (active: boolean) =>
+    `px-3 py-1.5 rounded-md text-sm focus:outline-none focus-visible:ring-2 focus-visible:ring-orange-300 ${
+      active ? 'bg-surface-light cursor-default pointer-events-none'
+             : 'cursor-pointer hover:bg-surface-light'
+    }`;
+  const THB = (n: number) => '฿ ' + Number(n || 0).toLocaleString();
+  const formatDT = (s?: string) => (s ? new Date(s).toLocaleString() : '');
+
+  // ---- fetch logic (เรียกเฉพาะตอน mount และตอนผู้ใช้กด/เปลี่ยนฟิลเตอร์) ----
+  let reqId = 0; // กันผลลัพธ์ข้ามรอบ
   async function load() {
-    loading = true;
-    err = '';
+    loading = true; error = '';
+    const my = ++reqId;
+
     try {
-      const data = await apiJson<{ items: Item[] }>('/api/history/purchases');
+      const qs = new URLSearchParams();
+      if (role !== 'all') qs.set('role', role);
+      if (status) qs.set('status', status);
+      if (q.trim()) qs.set('q', q.trim());
+      const qsStr = qs.toString();
+      const url = `/api/offers/mine${qsStr ? `?${qsStr}` : ''}`;
+
+      const data = await apiJson<{ items: OfferLite[] }>(url);
+      if (my !== reqId) return; // มีคำขอใหม่ทับแล้ว
+
       items = data.items ?? [];
     } catch (e: any) {
-      err = e?.message ?? 'Failed to load';
+      if (my !== reqId) return;
+      error = e?.message ?? 'Failed to load offers';
+      items = [];
     } finally {
-      loading = false;
+      if (my === reqId) loading = false;
     }
   }
 
-  const THB = (n: number) => `฿ ${Number(n).toLocaleString()}`;
-
-  // ---- image helpers (Cloudinary-safe thumb + fallback) ----
-  const DEFAULT_IMG =
-    "data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='200' height='200' viewBox='0 0 200 200'><rect width='200' height='200' fill='%23f1f1f1'/><rect x='40' y='40' width='120' height='120' rx='12' ry='12' fill='%23dedede'/></svg>";
-
-  function ensureHttps(url: string): string {
-    try {
-      const u = new URL(url, typeof window !== 'undefined' ? window.location.origin : 'http://localhost');
-      if (u.protocol === 'http:') u.protocol = 'https:';
-      return u.toString();
-    } catch {
-      return url;
-    }
-  }
-  function hasTransform(url: string): boolean {
-    const after = url.split('/upload/')[1] || '';
-    const first = after.split('/')[0] || '';
-    return first.includes(',') || /^[a-zA-Z]_[^/]+$/.test(first);
-  }
-  function toMini(url?: string | null, size = 300) {
-    if (!url) return DEFAULT_IMG;
-    url = ensureHttps(url);
-    if (!url.includes('/upload/')) return url;
-    if (hasTransform(url)) return url;
-    const t = `c_fill,w_${size},h_${size},q_auto,f_auto`;
-    return url.replace(/\/upload\/(v\d+\/)?/i, (_m, v) => `/upload/${t}/${v ?? ''}`);
-  }
-  function onThumbError(e: Event) {
-    const img = e.currentTarget as HTMLImageElement;
-    if (img.src !== DEFAULT_IMG) img.src = DEFAULT_IMG;
+  // อัปเดต URL ให้ตรงฟิลเตอร์ (ไม่ยิงโหลดอัตโนมัติ)
+  function syncUrl() {
+    const sp = new URLSearchParams();
+    if (role !== 'all') sp.set('role', role);
+    if (status) sp.set('status', status);
+    if (q.trim()) sp.set('q', q.trim());
+    const next = sp.toString() ? `/offers?${sp.toString()}` : '/offers';
+    history.replaceState(null, '', next);
   }
 
-  // ---- status badge style ----
-  function statusClass(s: string) {
-    switch (s?.toUpperCase()) {
-      case 'ACTIVE':
-        return 'border-emerald-200 bg-emerald-50 text-emerald-700';
-      case 'SOLD':
-        return 'border-neutral-200 bg-neutral-50 text-neutral-700';
-      case 'HIDDEN':
-        return 'border-amber-200 bg-amber-50 text-amber-700';
-      default:
-        return 'border-neutral-200 bg-neutral-50 text-neutral-600';
-    }
+  // init จาก URL แล้วค่อยโหลดครั้งเดียว
+  onMount(() => {
+    const sp = new URLSearchParams($page.url.search);
+    const r = sp.get('role'); const s = sp.get('status'); const qq = sp.get('q');
+    if (r === 'buyer' || r === 'seller' || r === 'all') role = r;
+    if (s) status = s;
+    if (qq) q = qq;
+    load();
+  });
+
+  // handlers: ผู้ใช้เปลี่ยนฟิลเตอร์แล้ว "ค่อย" โหลด
+  function setRole(next: RoleTab) {
+    if (role === next) return;
+    role = next;
+    syncUrl();
+    load();
   }
+  function onStatusChange(e: Event) {
+    status = (e.currentTarget as HTMLSelectElement).value;
+    syncUrl();
+    load();
+  }
+  function onSearchClick() {
+    syncUrl();
+    load();
+  }
+  function onSearchKeydown(e: KeyboardEvent) {
+    if (e.key === 'Enter') { e.preventDefault(); onSearchClick(); }
+  }
+
+  function openOffer(id: string) { goto(`/offers/${id}`); }
 </script>
 
-<section class="mx-auto max-w-5xl px-4 py-6 space-y-4">
-  <div class="flex items-center justify-between bg-white border border-surface p-4 rounded-xl">
-    <div >
-      <h1 class="text-2xl font-bold">Purchase History</h1>
-      <p class="text-sm text-neutral-500">All deals you have made in the system</p>
+<section class="mx-auto max-w-6xl px-4 py-6 space-y-4">
+  <!-- Header -->
+  <div class="flex items-center justify-between gap-3">
+    <div>
+      <h1 class="text-2xl font-bold">My Offers</h1>
+      <p class="text-sm text-neutral-600">All offers as both buyer and seller</p>
     </div>
-    <button
-      class="cursor-pointer rounded-full border border-surface px-4 py-2 text-sm hover:bg-neutral-50"
-      on:click={load}
-      disabled={loading}
-    >
-      {loading ? 'Loading…' : 'Refresh'}
-    </button>
   </div>
 
+  <!-- Filters -->
+  <div class="rounded-xl border border-surface bg-surface-white p-3 md:p-4 space-y-3 shadow-head">
+    <div class="flex flex-wrap items-center gap-2">
+      <!-- role tabs -->
+      <div class="inline-flex rounded-lg border border-surface p-1 bg-surface-white shadow-card/0">
+        <button class={tabClass(role === 'all')}    aria-pressed={role === 'all'}    on:click={() => setRole('all')}>All</button>
+        <button class={tabClass(role === 'buyer')}  aria-pressed={role === 'buyer'}  on:click={() => setRole('buyer')}>Buyer</button>
+        <button class={tabClass(role === 'seller')} aria-pressed={role === 'seller'} on:click={() => setRole('seller')}>Seller</button>
+      </div>
+
+      <!-- status select -->
+      <select
+        class="rounded border border-surface px-3 py-1.5 text-sm bg-surface-white focus:outline-none focus-visible:ring-2 focus-visible:ring-orange-300"
+        bind:value={status}
+        on:change={onStatusChange}
+        aria-label="Filter by status"
+      >
+        <option value="">ALL</option>
+        <option value="REQUESTED">WAITING</option>
+        <option value="REOFFER">RE-OFFER</option>
+        <option value="ACCEPTED">ACCEPTED</option>
+        <option value="COMPLETED">COMPLETED</option>
+        <option value="REJECTED">REJECTED</option>
+        <option value="CANCELLED">CANCELLED</option>
+      </select>
+
+      <!-- search -->
+      <div class="flex-1 min-w-[160px] flex items-center gap-2">
+        <input
+          class="flex-1 rounded border border-surface px-3 py-1.5 text-sm bg-surface-white focus:outline-none focus-visible:ring-2 focus-visible:ring-orange-300"
+          placeholder="Search by product/counterpart/location"
+          bind:value={q}
+          on:keydown={onSearchKeydown}
+        />
+        <button
+          class="rounded border border-surface px-3 py-1.5 text-sm hover:bg-surface-light"
+          on:click={onSearchClick}
+        >
+          Search
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- List -->
   {#if loading}
-    <!-- Skeleton grid -->
-    <div class="grid gap-3 sm:grid-cols-2">
+    <div class="grid gap-3">
       {#each Array(6) as _}
-        <div class="rounded-xl border border-surface bg-white p-3 flex gap-3">
-          <div class="h-20 w-20 rounded-lg bg-neutral-200 animate-pulse"></div>
-          <div class="flex-1 space-y-2">
-            <div class="h-4 w-3/4 bg-neutral-200 rounded animate-pulse"></div>
-            <div class="h-3 w-1/2 bg-neutral-200 rounded animate-pulse"></div>
-            <div class="h-3 w-2/3 bg-neutral-200 rounded animate-pulse"></div>
-          </div>
+        <div class="rounded-lg border border-surface p-3 bg-surface-white shadow-card">
+          <div class="h-5 w-1/3 bg-surface-light rounded mb-2 animate-pulse"></div>
+          <div class="h-4 w-1/2 bg-surface-light rounded animate-pulse"></div>
         </div>
       {/each}
     </div>
-  {:else if err}
-    <div class="rounded-xl border border-red-200 bg-red-50 p-3 text-red-700 text-sm flex items-start justify-between gap-3">
-      <span>{err}</span>
-      <button class="cursor-pointer rounded border px-3 py-1 text-sm" on:click={load}>Try Again</button>
-    </div>
+  {:else if error}
+    <div class="rounded border border-red-200 bg-red-50 p-3 text-red-700 text-sm">{error}</div>
   {:else if items.length === 0}
-    <!-- Empty state -->
-    <div class="rounded-xl border border-dashed border-surface bg-white p-10 text-center space-y-2">
-      <div class="text-lg font-semibold">No purchase history yet</div>
-      <p class="text-sm text-neutral-500">Start browsing products from the homepage</p>
-      <a
-        href="/"
-        class="inline-flex items-center gap-2 rounded-full bg-brand text-white px-4 py-2 text-sm hover:bg-brand-2 transition"
-      >
-        Go to Homepage
-      </a>
+    <div class="rounded-xl border border-dashed border-surface bg-surface-white p-8 text-center shadow-card">
+      <div class="text-lg font-semibold">No offers yet</div>
+      <div class="text-sm text-neutral-600">Offers will appear here when you start buying or selling</div>
     </div>
   {:else}
-    <!-- List -->
-    <ul class="space-y-3">
-      {#each items as it}
-        <li class="rounded-xl border border-surface bg-white p-3 sm:p-4">
-          <div class="flex gap-3">
-            <a href={`/listing/${it.listing.id}`} class="shrink-0">
-              <img
-                src={toMini(it.listing.imageUrls?.[0])}
-                alt={it.listing.title}
-                class="h-20 w-20 sm:h-24 sm:w-24 object-cover rounded-lg border"
-                referrerpolicy="no-referrer"
-                loading="lazy"
-                decoding="async"
-                on:error={onThumbError}
-              />
-            </a>
+    <div class="space-y-3">
+      {#each items as o (o.id)}
+        <article class="rounded-lg border border-surface p-3 bg-surface-white flex flex-col gap-3 shadow-card">
+          <!-- Top row -->
+          <div class="flex items-start gap-2">
+            <div class="font-semibold leading-snug line-clamp-2">{o.listing.title}</div>
+            <span class={`ml-auto inline-flex items-center rounded-full border px-2 py-0.5 text-[11px] ${statusBadge(o.status)}`}>
+              {STATUS_LABEL[o.status] ?? o.status}
+            </span>
+          </div>
 
-            <div class="flex-1 min-w-0">
-              <div class="flex flex-wrap items-start gap-2">
-                <a href={`/listing/${it.listing.id}`} class="font-semibold hover:underline truncate">
-                  {it.listing.title}
-                </a>
-                <span class={"ml-auto inline-flex items-center rounded-full border px-2 py-0.5 text-[11px] " + statusClass(it.listing.status)}>
-                  {it.listing.status}
-                </span>
-              </div>
-
-              <div class="mt-1 text-[15px] font-bold text-brand">{THB(it.listing.price)}</div>
-
-              <div class="mt-1 text-sm text-neutral-600">
-                Seller: <span class="font-medium">{it.seller?.name}</span>
-                <span class="mx-2">•</span>
-                Meet at: <span class="font-medium">{it.meetPlace}</span>
-              </div>
-              <div class="text-xs text-neutral-500">
-                Time: {new Date(it.meetTime).toLocaleString()}
-              </div>
-
-              <div class="mt-2 flex items-center justify-between gap-2">
-                <div class="text-[11px] text-neutral-400">Updated: {new Date(it.updatedAt).toLocaleString()}</div>
-                <a
-                  href={`/offers/${it.id}`}
-                  class="inline-flex items-center gap-1 rounded-full border px-3 py-1 text-xs hover:bg-neutral-50"
-                >
-                  View Deal Details
-                </a>
-              </div>
+          <!-- Details -->
+          <div class="grid sm:grid-cols-2 gap-2 text-sm">
+            <div>
+              <div class="text-neutral-500">Counterpart ({o.myRole === 'BUYER' ? 'Seller' : 'Buyer'})</div>
+              <div class="font-medium">{o.counterpart?.name}</div>
+            </div>
+            <div>
+              <div class="text-neutral-500">Price</div>
+              <div class="font-medium text-brand">{THB(o.listing.price)}</div>
+            </div>
+            <div>
+              <div class="text-neutral-500">Meeting place</div>
+              <div class="font-medium">{o.meetPlace}</div>
+            </div>
+            <div>
+              <div class="text-neutral-500">Date & Time</div>
+              <div class="font-medium">{formatDT(o.meetTime)}</div>
             </div>
           </div>
-        </li>
+
+          {#if o.note}
+            <div class="text-[12px] text-neutral-600">Note: {o.note}</div>
+          {/if}
+          {#if o.rejectReason}
+            <div class="text-[12px] text-red-600">Rejection reason: {o.rejectReason}</div>
+          {/if}
+
+          <div class="flex flex-wrap gap-2 pt-1">
+            <button
+              class="cursor-pointer rounded px-3 py-1.5 bg-brand border border-surface text-sm text-white font-semibold hover:bg-brand-h"
+              on:click={() => goto(`/offers/${o.id}`)}
+            >
+              Enter
+            </button>
+          </div>
+        </article>
       {/each}
-    </ul>
+    </div>
   {/if}
 </section>
 
 <style>
-  /* Prevent long product names from overflowing */
-  a.truncate { max-width: 48ch; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .line-clamp-2 {
+    display: -webkit-box;
+    -webkit-box-orient: vertical;
+    -webkit-line-clamp: 2;
+    line-clamp: 2;
+    overflow: hidden;
+  }
 </style>

@@ -70,7 +70,30 @@
 
 	let abort: AbortController | null = null;
 
-	
+	async function load() {
+		loading = true;
+		error = '';
+		try {
+			if (abort) abort.abort();
+			abort = new AbortController();
+
+			const qs = new URLSearchParams();
+			if (role !== 'all') qs.set('role', role);
+			if (status) qs.set('status', status);
+			if (q.trim()) qs.set('q', q.trim());
+
+			const data = await apiJson<{ items: OfferLite[] }>(`/api/offers/mine?${qs.toString()}`, {
+				signal: abort.signal
+			} as any);
+			items = data.items || [];
+		} catch (e: any) {
+			if (e?.name === 'AbortError') return;
+			error = e?.message || 'Failed to load offers';
+			items = [];
+		} finally {
+			loading = false;
+		}
+	}
 
 	onMount(() => {
 		const sp = new URLSearchParams($page.url.search);
@@ -80,6 +103,7 @@
 		if (r === 'buyer' || r === 'seller' || r === 'all') role = r;
 		if (s) status = s;
 		if (qq) q = qq;
+		load();
 	});
 
 	let t: any = null;
@@ -95,12 +119,15 @@
 			if (q.trim()) sp.set('q', q.trim());
 			const url = sp.toString() ? `/offers?${sp.toString()}` : '/offers';
 			history.replaceState(null, '', url);
-		
+			load();
 		}, 250);
 	})();
 
 	function openOffer(id: string) {
 		goto(`/offers/${id}`);
+	}
+	function openListing(id: string) {
+		goto(`/listings/${id}`);
 	}
 </script>
 
@@ -159,6 +186,7 @@
 				/>
 				<button
 					class="rounded border border-surface px-3 py-1.5 text-sm hover:bg-surface-light"
+					on:click={load}
 				>
 					Search
 				</button>
