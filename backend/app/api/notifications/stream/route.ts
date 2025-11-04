@@ -5,7 +5,7 @@ import jwt from 'jsonwebtoken';
 
 const FE_ORIGIN = process.env.FE_ORIGIN || 'http://localhost:5173';
 const JWT_SECRET = process.env.JWT_SECRET!;
-const pool = new Pool({ connectionString: process.env.DIRECT_URL });
+const pool = new Pool({ connectionString: process.env.DATABASE_URL });
 
 type Me = { sub: string; name?: string; role?: string; avatarUrl?: string | null };
 
