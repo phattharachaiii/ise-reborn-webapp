@@ -1,7 +1,8 @@
-export const runtime = 'nodejs';
 import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { getUserFromRequest } from '@/lib/auth';
+
+export const runtime = 'nodejs';
 
 const FE_ORIGIN = process.env.FE_ORIGIN || 'http://localhost:5173';
 
@@ -28,7 +29,7 @@ export async function GET(req: Request) {
     if (!me) return withCORS(NextResponse.json({ message: 'UNAUTHORIZED' }, { status: 401 }));
 
     const url = new URL(req.url);
-    const role = (url.searchParams.get('role') || 'buyer').toLowerCase();
+    const role = (url.searchParams.get('role') || 'all').toLowerCase();
     const status = url.searchParams.get('status') || '';
     const q = (url.searchParams.get('q') || '').trim();
 
@@ -56,7 +57,7 @@ export async function GET(req: Request) {
             seller: { select: { id: true, name: true, avatarUrl: true } },
         },
         orderBy: { updatedAt: 'desc' } as const, // <-- เติม as const ตรงนี้
-        take: 100,
+        take: 10,
     };
 
     if (role === 'buyer') {
