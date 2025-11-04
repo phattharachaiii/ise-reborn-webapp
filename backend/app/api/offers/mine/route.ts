@@ -4,7 +4,6 @@ import { getUserFromRequest } from '@/lib/auth';
 import { withCORS, preflight } from '@lib/_utils/cors';
 export const runtime = 'nodejs';
 
-const FE_ALLOW = process.env.FE_ORIGIN || 'http://localhost:5173';
 
 export async function OPTIONS(req: Request) {
     return preflight(req);
