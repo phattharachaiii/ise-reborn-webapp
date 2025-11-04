@@ -4,7 +4,7 @@ import crypto from 'crypto';
 
 export const runtime = 'nodejs';
 
-const FE_ORIGIN = process.env.FE_ORIGIN || 'http://localhost:5173';
+const PUBLIC_FRONTEND_ORIGIN = process.env.PUBLIC_FRONTEND_ORIGIN || 'http://localhost:5173';
 
 const CLOUDINARY_CLOUD_NAME = process.env.CLOUDINARY_CLOUD_NAME!;
 const CLOUDINARY_API_KEY = process.env.CLOUDINARY_API_KEY!;
@@ -12,7 +12,7 @@ const CLOUDINARY_API_SECRET = process.env.CLOUDINARY_API_SECRET!;
 const CLOUDINARY_UPLOAD_PRESET = process.env.CLOUDINARY_UPLOAD_PRESET || ''; // (ถ้าใช้ preset แบบ "Signed")
 
 function withCORS(res: NextResponse) {
-    res.headers.set('Access-Control-Allow-Origin', FE_ORIGIN);
+    res.headers.set('Access-Control-Allow-Origin', PUBLIC_FRONTEND_ORIGIN);
     res.headers.set('Access-Control-Allow-Headers', 'Content-Type, Authorization');
     res.headers.set('Access-Control-Allow-Methods', 'POST,OPTIONS');
     res.headers.set('Access-Control-Allow-Credentials', 'true');

@@ -2,12 +2,12 @@
 import { NextResponse } from 'next/server';
 import { getUserFromRequest } from '@/lib/auth';
 
-const FE_ORIGIN = process.env.FE_ORIGIN || 'http://localhost:5173';
+const PUBLIC_FRONTEND_ORIGIN = process.env.PUBLIC_FRONTEND_ORIGIN || 'http://localhost:5173';
 const QR_SECRET = process.env.QR_SECRET || '';         // ถ้าไม่ได้ใช้ลายเซ็น ปล่อยว่างได้
 const QR_DEBUG = String(process.env.QR_DEBUG || 'false').toLowerCase() === 'true';
 
 function withCORS(res: NextResponse, methods: string[] = ['POST']) {
-    res.headers.set('Access-Control-Allow-Origin', FE_ORIGIN);
+    res.headers.set('Access-Control-Allow-Origin', PUBLIC_FRONTEND_ORIGIN);
     res.headers.set('Access-Control-Allow-Headers', 'Content-Type, Authorization');
     res.headers.set('Access-Control-Allow-Methods', [...methods, 'OPTIONS'].join(','));
     res.headers.set('Access-Control-Allow-Credentials', 'true');

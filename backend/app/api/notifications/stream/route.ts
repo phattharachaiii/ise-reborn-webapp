@@ -3,7 +3,7 @@ import { NextResponse } from 'next/server';
 import { Pool } from 'pg';
 import jwt from 'jsonwebtoken';
 
-const FE_ORIGIN = process.env.FE_ORIGIN || 'http://localhost:5173';
+const PUBLIC_FRONTEND_ORIGIN = process.env.PUBLIC_FRONTEND_ORIGIN || 'http://localhost:5173';
 const JWT_SECRET = process.env.JWT_SECRET!;
 const pool = new Pool({ connectionString: process.env.DATABASE_URL });
 
@@ -39,7 +39,7 @@ export async function GET(req: Request) {
         'Content-Type': 'text/event-stream',
         'Cache-Control': 'no-cache, no-transform',
         Connection: 'keep-alive',
-        'Access-Control-Allow-Origin': FE_ORIGIN,
+        'Access-Control-Allow-Origin': PUBLIC_FRONTEND_ORIGIN,
         'Access-Control-Allow-Credentials': 'true',
         'X-Accel-Buffering': 'no',
     } as const;
@@ -102,7 +102,7 @@ export async function GET(req: Request) {
 
 export async function OPTIONS() {
     const res = NextResponse.json({ ok: true });
-    res.headers.set('Access-Control-Allow-Origin', FE_ORIGIN);
+    res.headers.set('Access-Control-Allow-Origin', PUBLIC_FRONTEND_ORIGIN);
     res.headers.set('Access-Control-Allow-Headers', 'Content-Type, Authorization');
     res.headers.set('Access-Control-Allow-Methods', 'GET, OPTIONS');
     res.headers.set('Access-Control-Allow-Credentials', 'true');

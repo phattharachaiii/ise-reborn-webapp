@@ -8,6 +8,6 @@ declare namespace NodeJS {
     JWT_SECRET: string;
     DATABASE_URL: string;
     NODE_ENV: 'development' | 'production' | 'test';
-    FE_ORIGIN: string;
+    PUBLIC_FRONTEND_ORIGIN: string;
   }
 }

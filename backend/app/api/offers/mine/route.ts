@@ -4,7 +4,7 @@ import { getUserFromRequest } from '@/lib/auth';
 
 export const runtime = 'nodejs';
 
-const FE_ALLOW = process.env.FE_ORIGIN || 'http://localhost:5173';
+const FE_ALLOW = process.env.PUBLIC_FRONTEND_ORIGIN || 'http://localhost:5173';
 
 const withCORS = (res: NextResponse) => {
     res.headers.set('Access-Control-Allow-Origin', FE_ALLOW);
