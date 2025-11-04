@@ -4,7 +4,6 @@ declare namespace NodeJS {
     CLOUDINARY_API_KEY: string;
     CLOUDINARY_API_SECRET: string;
     CLOUDINARY_UPLOAD_PRESET: string;
-    VITE_API_BASE: string;
     ALLOWED_EMAIL_DOMAINS: string;
     JWT_SECRET: string;
     DATABASE_URL: string;

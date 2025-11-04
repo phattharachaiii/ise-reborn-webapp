@@ -3,6 +3,7 @@ import { prisma } from '@/lib/prisma';
 import { getUserFromRequest } from '@/lib/auth';
 
 const FE_ORIGIN = process.env.FE_ORIGIN || 'http://localhost:5173';
+
 const withCORS = (res: NextResponse) => {
     res.headers.set('Access-Control-Allow-Origin', FE_ORIGIN);
     res.headers.set('Access-Control-Allow-Headers', 'Content-Type, Authorization');
@@ -10,6 +11,7 @@ const withCORS = (res: NextResponse) => {
     res.headers.set('Access-Control-Allow-Credentials', 'true');
     return res;
 };
+
 export async function OPTIONS() {
     return withCORS(new NextResponse(null, { status: 204 }));
 }
@@ -25,16 +27,17 @@ export async function GET(req: Request) {
     if (!me) return withCORS(NextResponse.json({ message: 'UNAUTHORIZED' }, { status: 401 }));
 
     const url = new URL(req.url);
-    const role = (url.searchParams.get('role') || 'all').toLowerCase(); // buyer|seller|all
+    const role = (url.searchParams.get('role') || 'all').toLowerCase();
     const status = url.searchParams.get('status') || '';
     const q = (url.searchParams.get('q') || '').trim();
 
     const whereCommon: any = {};
     if (status) whereCommon.status = status.toUpperCase();
 
-    // ค้นหาแบบหลวม ๆ
+    // สร้างเงื่อนไขการค้นหา 'q' แยกไว้
+    const whereForQ: any = {};
     if (q) {
-        whereCommon.OR = [
+        whereForQ.OR = [
             { listing: { title: { contains: q, mode: 'insensitive' } } },
             { meetPlace: { contains: q, mode: 'insensitive' } },
             { buyer: { name: { contains: q, mode: 'insensitive' } } },
@@ -42,21 +45,51 @@ export async function GET(req: Request) {
         ];
     }
 
-    let where: any;
-    if (role === 'buyer') where = { ...whereCommon, buyerId: me.id };
-    else if (role === 'seller') where = { ...whereCommon, sellerId: me.id };
-    else where = { ...whereCommon, OR: [{ buyerId: me.id }, { sellerId: me.id }] };
+    let items = [];
 
-    const items = await prisma.offer.findMany({
-        where,
+    // สร้าง Option ที่ใช้ร่วมกันสำหรับทุก Query
+    const findOptions = {
         include: {
             listing: { select: { id: true, title: true, price: true, imageUrls: true, status: true } },
             buyer: { select: { id: true, name: true, avatarUrl: true } },
             seller: { select: { id: true, name: true, avatarUrl: true } },
         },
-        orderBy: { updatedAt: 'desc' },
-        take: 100, // ปรับตามใจ
-    });
+        orderBy: { updatedAt: 'desc' } as const, // <-- เติม as const ตรงนี้
+        take: 100,
+    };
+
+    if (role === 'buyer') {
+        // Query เร็ว (ยิง Index เดียว)
+        items = await prisma.offer.findMany({
+            where: { ...whereCommon, ...whereForQ, buyerId: me.id },
+            ...findOptions,
+        });
+    } else if (role === 'seller') {
+        // Query เร็ว (ยิง Index เดียว)
+        items = await prisma.offer.findMany({
+            where: { ...whereCommon, ...whereForQ, sellerId: me.id },
+            ...findOptions,
+        });
+    } else {
+        // แก้ปัญหา Query 'OR' (role === 'all') โดยการรัน 2 Query ที่เร็วกว่า
+        
+        // 1. รัน 2 query ที่เร็ว (ยิงเข้า Index ตรงๆ) พร้อมกัน
+        const buyerOffers = prisma.offer.findMany({
+            where: { ...whereCommon, ...whereForQ, buyerId: me.id },
+            ...findOptions,
+        });
+        const sellerOffers = prisma.offer.findMany({
+            where: { ...whereCommon, ...whereForQ, sellerId: me.id },
+            ...findOptions,
+        });
+
+        // 2. รอให้เสร็จพร้อมกัน
+        const [buyerItems, sellerItems] = await Promise.all([buyerOffers, sellerOffers]);
+        
+        // 3. รวมผลลัพธ์ใน JS และ Sort ใหม่อีกครั้ง
+        items = [...buyerItems, ...sellerItems];
+        items.sort((a, b) => b.updatedAt.getTime() - a.updatedAt.getTime());
+    }
 
     // ใส่ role ฝั่งเราลงไปเพื่อใช้บน FE
     const mapped = items.map((o) => ({
