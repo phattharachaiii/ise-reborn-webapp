@@ -25,7 +25,7 @@
 	let items: OfferLite[] = [];
 
 	type RoleTab = 'all' | 'buyer' | 'seller';
-	let role: RoleTab = 'buyer';
+	let role: RoleTab = 'all';
 	let status = '';
 	let q = '';
 
@@ -125,9 +125,6 @@
 
 	function openOffer(id: string) {
 		goto(`/offers/${id}`);
-	}
-	function openListing(id: string) {
-		goto(`/listings/${id}`);
 	}
 </script>
 
