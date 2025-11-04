@@ -56,8 +56,7 @@ export async function GET(req: Request) {
             buyer: { select: { id: true, name: true, avatarUrl: true } },
             seller: { select: { id: true, name: true, avatarUrl: true } },
         },
-        orderBy: { updatedAt: 'desc' } as const, // <-- เติม as const ตรงนี้
-        take: 10,
+        orderBy: { updatedAt: 'desc' } as const
     };
 
     if (role === 'buyer') {
