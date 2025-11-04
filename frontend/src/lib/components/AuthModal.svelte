@@ -111,32 +111,65 @@
 
 	let firstInput: HTMLInputElement | null = null;
 	$: if (open) tick().then(() => firstInput?.focus());
+
+	let dialogEl: HTMLDivElement | null = null;
+	function handleGlobalKeys(e: KeyboardEvent) {
+		if (!open) return;
+
+		// ปิดด้วย ESC
+		if (e.key === 'Escape') {
+			e.preventDefault();
+			closeAuth();
+			resetFields();
+			return;
+		}
+
+		// ลูกศรขึ้น/ลง เปลี่ยนโฟกัสภายในโมดัล
+		if (e.key === 'ArrowDown' || e.key === 'ArrowUp') {
+			const focusables = dialogEl?.querySelectorAll<HTMLElement>(
+				// input / button / ลิงก์ ที่ยัง active
+				'input:not([type="hidden"]):not([disabled]), button:not([disabled]), a[href]'
+			);
+			if (!focusables || focusables.length === 0) return;
+
+			const current = document.activeElement as HTMLElement | null;
+			let idx = Array.from(focusables).findIndex((el) => el === current);
+
+			// ถ้ายังไม่มีโฟกัสในโมดัล ให้ไปที่ตัวแรก
+			if (idx === -1) {
+				(focusables[0] as HTMLElement).focus();
+				e.preventDefault();
+				return;
+			}
+
+			const dir = e.key === 'ArrowDown' ? 1 : -1;
+			idx = (idx + dir + focusables.length) % focusables.length;
+			(focusables[idx] as HTMLElement).focus();
+			e.preventDefault();
+		}
+	}
 </script>
 
+<svelte:window on:keydown={handleGlobalKeys} />
 {#if open}
 	<!-- svelte-ignore a11y_click_events_have_key_events -->
 	<!-- svelte-ignore a11y_no_static_element_interactions -->
-	<div
-		class="fixed inset-0 z-50 grid place-items-center bg-black/60"
-		on:click={() => {
-			closeAuth();
-			resetFields();
-		}}
-	>
+	<div class="fixed inset-0 z-50 grid place-items-center bg-black/60" role="presentation">
 		<div
 			class="w-[90%] max-w-md rounded-xl bg-white p-6 shadow-lg overflow-auto max-h-[85vh]"
 			role="dialog"
 			aria-modal="true"
 			tabindex="-1"
+			bind:this={dialogEl}
 			on:click|stopPropagation
 		>
 			<div class="flex items-center justify-between mb-4">
 				<h3 class="text-xl font-bold">{mode === 'login' ? 'Login' : 'Register'}</h3>
 				<button
 					class="text-sm -mt-2 cursor-pointer px-2 py-1 text-sm font-semibold text-gray-600 hover:text-white
-         bg-gray-100 hover:bg-red-500 
+         bg-gray-100 hover:bg-red-500
          rounded-full shadow-sm transition-all duration-200
-         hover:scale-105 active:scale-95 "
+         hover:scale-105 active:scale-95"
 					on:click={() => {
 						closeAuth();
 						resetFields();
@@ -190,7 +223,8 @@
 						>
 					</p>
 					<p class="text-[11px] text-neutral-500 text-center">
-						(The system may restrict allowed email domains, e.g., <code>kmitl.ac.th</code> — if not accepted, you will be notified.)
+						(The system may restrict allowed email domains, e.g., <code>kmitl.ac.th</code> — if not accepted,
+						you will be notified.)
 					</p>
 				</form>
 			{:else}
