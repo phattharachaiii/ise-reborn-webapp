@@ -27,7 +27,7 @@ export async function GET(req: Request) {
     if (!me) return withCORS(NextResponse.json({ message: 'UNAUTHORIZED' }, { status: 401 }));
 
     const url = new URL(req.url);
-    const role = (url.searchParams.get('role') || 'all').toLowerCase();
+    const role = (url.searchParams.get('role') || 'buyer').toLowerCase();
     const status = url.searchParams.get('status') || '';
     const q = (url.searchParams.get('q') || '').trim();
 
