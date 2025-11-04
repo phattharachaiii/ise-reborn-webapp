@@ -17,4 +17,4 @@ RUN npm run build
 EXPOSE 5173
 ENV PORT=5173
 ENV HOST=0.0.0.0
-CMD npm run start   # <- จะเรียก vite preview
+CMD npm run start  
