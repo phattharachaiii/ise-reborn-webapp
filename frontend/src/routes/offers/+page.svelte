@@ -1,35 +1,34 @@
-<!-- src/routes/offers/+page.svelte -->
 <script lang="ts">
-	import { onMount } from 'svelte';
-	import { page } from '$app/stores';
-	import { apiJson } from '$lib/api/client';
 	import { goto } from '$app/navigation';
 
-	type OfferLite = {
-		id: string;
-		status: 'REQUESTED' | 'ACCEPTED' | 'REJECTED' | 'REOFFER' | 'COMPLETED' | 'CANCELLED';
-		meetPlace: string;
-		meetTime: string;
-		note?: string | null;
-		rejectReason?: string | null;
-		lastActor: 'BUYER' | 'SELLER';
-		updatedAt: string;
-		myRole: 'BUYER' | 'SELLER';
-		qrToken?: string | null;
-		listing: { id: string; title: string; price: number; imageUrls: string[]; status: string };
-		counterpart: { id: string; name: string; avatarUrl?: string | null };
+	// data ถูกโหลดมาจาก +page.server.ts
+	export let data: {
+		items: Array<{
+			id: string;
+			status: 'REQUESTED' | 'ACCEPTED' | 'REJECTED' | 'REOFFER' | 'COMPLETED' | 'CANCELLED';
+			meetPlace: string;
+			meetTime: string;
+			note?: string | null;
+			rejectReason?: string | null;
+			lastActor: 'BUYER' | 'SELLER';
+			updatedAt: string | Date;
+			myRole: 'BUYER' | 'SELLER';
+			qrToken?: string | null;
+			listing: { id: string; title: string; price: number; imageUrls?: string[]; status: string };
+			counterpart: { id: string; name: string; avatarUrl?: string | null };
+		}>;
+		error?: string;
+		filters: { role: 'all' | 'buyer' | 'seller'; status: string; q: string };
 	};
 
-	let loading = true,
-		error = '';
-	let items: OfferLite[] = [];
-
 	type RoleTab = 'all' | 'buyer' | 'seller';
-	let role: RoleTab = 'all';
-	let status = '';
-	let q = '';
 
-	// Status labels (text)
+	// สถานะเริ่มต้นมาจาก server
+	let role: RoleTab = data.filters.role ?? 'all';
+	let status = data.filters.status ?? '';
+	let q = data.filters.q ?? '';
+
+	// label / badge
 	const STATUS_LABEL: Record<string, string> = {
 		REQUESTED: 'WAITING',
 		REOFFER: 'RE-OFFER',
@@ -38,9 +37,7 @@
 		REJECTED: 'REJECTED',
 		CANCELLED: 'CANCELLED'
 	};
-
-	// Status badge (theme color)
-	const statusBadge = (s: OfferLite['status']) => {
+	const statusBadge = (s: (typeof data.items)[number]['status']) => {
 		switch (s) {
 			case 'REQUESTED':
 			case 'REOFFER':
@@ -57,74 +54,27 @@
 				return 'bg-surface-light text-text-base border-surface';
 		}
 	};
-
-	// Role tab (active=no hover/cursor-pointer)
 	const tabClass = (active: boolean) =>
-		`px-3 py-1.5 rounded-md text-sm focus:outline-none focus-visible:ring-2 focus-visible:ring-orange-300 ` +
-		(active
-			? 'bg-surface-light cursor-default pointer-events-none'
-			: 'cursor-pointer hover:bg-surface-light');
+		`px-3 py-1.5 rounded-md text-sm focus:outline-none focus-visible:ring-2 focus-visible:ring-orange-300 ${
+			active
+				? 'bg-surface-light cursor-default pointer-events-none'
+				: 'cursor-pointer hover:bg-surface-light'
+		}`;
+	const THB = (n: number) => '฿ ' + Number(n || 0).toLocaleString('th-TH');
+	const formatDT = (s?: string | Date) => (s ? new Date(s).toLocaleString('th-TH') : '');
 
-	const THB = (n: number) => '฿ ' + Number(n || 0).toLocaleString();
-	const formatDT = (s?: string) => (s ? new Date(s).toLocaleString() : '');
-
-	let abort: AbortController | null = null;
-
-	async function load() {
-		loading = true;
-		error = '';
-		try {
-			if (abort) abort.abort();
-			abort = new AbortController();
-
-			const qs = new URLSearchParams();
-			if (role !== 'all') qs.set('role', role);
-			if (status) qs.set('status', status);
-			if (q.trim()) qs.set('q', q.trim());
-
-			const data = await apiJson<{ items: OfferLite[] }>(`/api/offers/mine?${qs.toString()}`, {
-				signal: abort.signal
-			} as any);
-			items = data.items || [];
-		} catch (e: any) {
-			if (e?.name === 'AbortError') return;
-			error = e?.message || 'Failed to load offers';
-			items = [];
-		} finally {
-			loading = false;
-		}
-	}
-
-	onMount(() => {
-		const sp = new URLSearchParams($page.url.search);
-		const r = sp.get('role');
-		const s = sp.get('status');
-		const qq = sp.get('q');
-		if (r === 'buyer' || r === 'seller' || r === 'all') role = r;
-		if (s) status = s;
-		if (qq) q = qq;
-		load();
-	});
-
-	let t: any = null;
-	$: (async () => {
-		role;
-		status;
-		q;
-		if (t) clearTimeout(t);
-		t = setTimeout(() => {
+	// เปลี่ยนตัวกรอง -> เขียน query string -> ให้ SvelteKit reload (SSR) ด้วย goto()
+	let debounce: ReturnType<typeof setTimeout> | null = null;
+	function updateURLAndReload() {
+		if (debounce) clearTimeout(debounce);
+		debounce = setTimeout(() => {
 			const sp = new URLSearchParams();
 			if (role !== 'all') sp.set('role', role);
 			if (status) sp.set('status', status);
 			if (q.trim()) sp.set('q', q.trim());
 			const url = sp.toString() ? `/offers?${sp.toString()}` : '/offers';
-			history.replaceState(null, '', url);
-			load();
+			goto(url, { replaceState: true, noScroll: true }); // จะไปเรียก +page.server.ts ใหม่
 		}, 250);
-	})();
-
-	function openOffer(id: string) {
-		goto(`/offers/${id}`);
 	}
 </script>
 
@@ -145,17 +95,26 @@
 				<button
 					class={tabClass(role === 'all')}
 					aria-pressed={role === 'all'}
-					on:click={() => (role = 'all')}>All</button
+					on:click={() => {
+						role = 'all';
+						updateURLAndReload();
+					}}>All</button
 				>
 				<button
 					class={tabClass(role === 'buyer')}
 					aria-pressed={role === 'buyer'}
-					on:click={() => (role = 'buyer')}>Buyer</button
+					on:click={() => {
+						role = 'buyer';
+						updateURLAndReload();
+					}}>Buyer</button
 				>
 				<button
 					class={tabClass(role === 'seller')}
 					aria-pressed={role === 'seller'}
-					on:click={() => (role = 'seller')}>Seller</button
+					on:click={() => {
+						role = 'seller';
+						updateURLAndReload();
+					}}>Seller</button
 				>
 			</div>
 
@@ -163,6 +122,7 @@
 			<select
 				class="rounded border border-surface px-3 py-1.5 text-sm bg-surface-white focus:outline-none focus-visible:ring-2 focus-visible:ring-orange-300"
 				bind:value={status}
+				on:change={updateURLAndReload}
 				aria-label="Filter by status"
 			>
 				<option value="">ALL</option>
@@ -180,10 +140,11 @@
 					class="flex-1 rounded border border-surface px-3 py-1.5 text-sm bg-surface-white focus:outline-none focus-visible:ring-2 focus-visible:ring-orange-300"
 					placeholder="Search by product/counterpart/location"
 					bind:value={q}
+					on:input={updateURLAndReload}
 				/>
 				<button
 					class="rounded border border-surface px-3 py-1.5 text-sm hover:bg-surface-light"
-					on:click={load}
+					on:click={updateURLAndReload}
 				>
 					Search
 				</button>
@@ -192,31 +153,26 @@
 	</div>
 
 	<!-- List -->
-	{#if loading}
-		<div class="grid gap-3">
-			{#each Array(6) as _}
-				<div class="rounded-lg border border-surface p-3 bg-surface-white shadow-card">
-					<div class="h-5 w-1/3 bg-surface-light rounded mb-2 animate-pulse"></div>
-					<div class="h-4 w-1/2 bg-surface-light rounded animate-pulse"></div>
-				</div>
-			{/each}
+	{#if data.error}
+		<div class="rounded border border-red-200 bg-red-50 p-3 text-red-700 text-sm">
+			โหลดรายการไม่สำเร็จ: {data.error}
 		</div>
-	{:else if error}
-		<div class="rounded border border-red-200 bg-red-50 p-3 text-red-700 text-sm">{error}</div>
-	{:else if items.length === 0}
+	{:else if !data.items?.length}
 		<div
 			class="rounded-xl border border-dashed border-surface bg-surface-white p-8 text-center shadow-card"
 		>
 			<div class="text-lg font-semibold">No offers yet</div>
-			<div class="text-sm text-neutral-600">Offers will appear here when you start buying or selling</div>
+			<div class="text-sm text-neutral-600">
+				Offers will appear here when you start buying or selling
+			</div>
 		</div>
 	{:else}
 		<div class="space-y-3">
-			{#each items as o (o.id)}
+			{#each data.items as o (o.id)}
 				<article
 					class="rounded-lg border border-surface p-3 bg-surface-white flex flex-col gap-3 shadow-card"
 				>
-					<!-- Top row: product name + status + my role -->
+					<!-- Top row -->
 					<div class="flex items-start gap-2">
 						<div class="font-semibold leading-snug line-clamp-2">{o.listing.title}</div>
 						<span
@@ -226,7 +182,7 @@
 						</span>
 					</div>
 
-					<!-- Details: counterpart + price + meeting -->
+					<!-- Details -->
 					<div class="grid sm:grid-cols-2 gap-2 text-sm">
 						<div>
 							<div class="text-neutral-500">
@@ -257,12 +213,12 @@
 
 					<!-- CTA -->
 					<div class="flex flex-wrap gap-2 pt-1">
-						<button
+						<a
 							class="cursor-pointer rounded px-3 py-1.5 bg-brand border border-surface text-sm text-white font-semibold hover:bg-brand-h"
-							on:click={() => openOffer(o.id)}
+							href={`/offers/${o.id}`}
 						>
 							Enter
-						</button>
+						</a>
 					</div>
 				</article>
 			{/each}
