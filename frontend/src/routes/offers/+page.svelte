@@ -25,7 +25,7 @@
 	let items: OfferLite[] = [];
 
 	type RoleTab = 'all' | 'buyer' | 'seller';
-	let role: RoleTab = 'all';
+	let role: RoleTab = 'buyer';
 	let status = '';
 	let q = '';
 
