@@ -56,7 +56,7 @@ export async function POST(req: Request) {
             return withCORS(NextResponse.json({ message: 'WEAK_PASSWORD' }, { status: 400 }));
         }
         if (!isEmailAllowed(email)) {
-            return withCORS(NextResponse.json({ message: 'EMAIL_DOMAIN_NOT_ALLOWED' }, { status: 400 }));
+            return withCORS(NextResponse.json({ message: 'Please use your KMITL email address (@kmitl.ac.th)' }, { status: 400 }));
         }
 
         const existed = await prisma.user.findUnique({ where: { email } });

@@ -9,7 +9,6 @@
 	import QrBox from '$lib/components/QrBox.svelte';
 	import { ShareNodesSolid } from 'flowbite-svelte-icons';
 	const auth = authStore;
-
 	// ---------- Types ----------
 	type Listing = {
 		id: string;
@@ -496,9 +495,9 @@
 
 						{#if listing.imageUrls?.length > 1}
 							<div
-								class="md:grid md:grid-cols-4 md:gap-2 overflow-x-auto md:overflow-visible no-scrollbar -mx-1 px-1"
+								class="overflow-x-auto md:overflow-visible no-scrollbar -mx-1 px-1"
 							>
-								<div class="flex md:block gap-2 md:gap-0">
+								<div class="gap-2">
 									{#each listing.imageUrls as u, i (u)}
 										<button
 											type="button"
@@ -528,7 +527,7 @@
 					<!-- Right: details -->
 					<div class="bg-white rounded-xl border border-surface shadow-card p-4 md:p-6 relative">
 						<!-- Status chip at corner -->
-						<div class="absolute right-4 ">
+						<div class="absolute right-4">
 							<span
 								class="rounded-full border px-2.5 py-0.5 text-xs
 									{listing.status === 'ACTIVE' ? 'bg-green-50 text-green-700 border-green-200' : ''}
@@ -592,7 +591,15 @@
 								{/if}
 								<div class="leading-tight">
 									<div class="text-xs text-neutral-500">Seller</div>
-									<div class="text-[15px] font-medium">{listing.seller?.name}</div>
+									<div class="text-[15px] font-medium">
+										{#if listing.seller?.id}
+											<a class="text-brand hover:underline" href={'/profile/' + listing.seller.id}>
+												{listing.seller?.name ?? 'Seller'}
+											</a>
+										{:else}
+											{listing.seller?.name ?? 'Seller'}
+										{/if}
+									</div>
 								</div>
 							</div>
 
@@ -743,9 +750,7 @@
 						<h2 class="text-lg font-bold mb-2">Incoming Purchase Requests</h2>
 
 						{#if loadingOffers}
-							<div class="rounded border border-surface bg-surface-light p-3 text-sm">
-								Loading…
-							</div>
+							<div class="rounded border border-surface bg-surface-light p-3 text-sm">Loading…</div>
 						{:else if offersError}
 							<div class="rounded border border-red-200 bg-red-50 p-3 text-sm text-red-700">
 								{offersError}
@@ -775,7 +780,9 @@
 												<div class="text-[12px] text-neutral-500">Note from buyer: {o.note}</div>
 											{/if}
 											{#if o.rejectReason}
-												<div class="text-[12px] text-red-600">Rejection reason: {o.rejectReason}</div>
+												<div class="text-[12px] text-red-600">
+													Rejection reason: {o.rejectReason}
+												</div>
 											{/if}
 										</div>
 
@@ -802,7 +809,9 @@
 														{#if o.status === 'REOFFER'}The other party proposed a new date/time{/if}
 													</div>
 												{:else}
-													<div class="text-[12px] text-neutral-500">Waiting for buyer to proceed…</div>
+													<div class="text-[12px] text-neutral-500">
+														Waiting for buyer to proceed…
+													</div>
 												{/if}
 											</div>
 										{/if}

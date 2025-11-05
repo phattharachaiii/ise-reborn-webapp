@@ -30,14 +30,14 @@ export async function POST(req: Request) {
         }
 
         const user = await prisma.user.findUnique({ where: { email } });
-        if (!user) return withCORS(NextResponse.json({ message: 'INVALID_CREDENTIALS' }, { status: 401 }));
+        if (!user) return withCORS(NextResponse.json({ message: 'The email or password you entered is incorrect' }, { status: 401 }));
 
         if (user.accountStatus !== 'ACTIVE') {
             return withCORS(NextResponse.json({ message: `ACCOUNT_${user.accountStatus}` }, { status: 403 }));
         }
 
         const ok = await bcrypt.compare(password, user.passwordHash);
-        if (!ok) return withCORS(NextResponse.json({ message: 'INVALID_CREDENTIALS' }, { status: 401 }));
+        if (!ok) return withCORS(NextResponse.json({ message: 'The email or password you entered is incorrect' }, { status: 401 }));
 
         const payload = { sub: user.id, role: user.role, name: user.name, avatarUrl: user.avatarUrl ?? null };
         const token = jwt.sign(payload, JWT_SECRET, { expiresIn: TOKEN_TTL_SEC });

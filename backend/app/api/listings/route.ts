@@ -62,6 +62,7 @@ export async function GET(req: Request) {
   const catRaw = (url.searchParams.get('category') || '').trim().toUpperCase();
   const statusParam = (url.searchParams.get('status') || '').trim().toUpperCase();
   const mine = /^(1|true)$/i.test(url.searchParams.get('mine') || '');
+  const sellerIdParam = (url.searchParams.get('sellerId') || '').trim();
   const excludeMine = url.searchParams.get('excludeMine') === '1';
   const limit = Math.min(Math.max(parseInt(url.searchParams.get('limit') || '24', 10) || 24, 1), 60);
   const cursor = url.searchParams.get('cursor') || undefined;
@@ -80,7 +81,9 @@ export async function GET(req: Request) {
   const where: any = {};
   if (statusWhere) where.status = statusWhere;
 
-  if (mine) {
+  if (sellerIdParam) {
+    where.sellerId = sellerIdParam;
+  } else if (mine) {
     if (!me) return withCORS(NextResponse.json({ items: [], nextCursor: null }, { status: 200 }), req);
     where.sellerId = me.id;
   } else if (excludeMine && me) {
@@ -100,16 +103,15 @@ export async function GET(req: Request) {
 
   const findArgs: any = {
     where,
-    orderBy: [{ boostedUntil: 'desc' }, { createdAt: 'desc' }],
+    orderBy: [{ createdAt: 'desc' }],
     take: limit + 1, // +1 เพื่อตรวจว่ามีหน้าถัดไปไหม
     select: {
       id: true,
       title: true,
       price: true,
       status: true,
-      imageUrls: true,     // เก็บเป็น string[]
+      imageUrls: true,    
       category: true,
-      boostedUntil: true,
       seller: { select: { id: true, name: true, avatarUrl: true } },
     },
   };
@@ -191,19 +193,6 @@ export async function POST(req: Request) {
     // รวมรูปจากทั้งสองคีย์ แล้วกรองซ้ำ/ว่าง ให้ได้ string[]
     const imgs = Array.from(new Set([...normArray(images), ...normArray(imageUrls)]));
 
-    // จัดการ boost (มีลิมิตจำนวนที่ยังไม่หมดอายุ)
-    let boostedUntil: Date | null = null;
-    let boostedAt: Date | null = null;
-    if (boost) {
-      const activeBoosts = await prisma.listing.count({
-        where: { sellerId: me.id, boostedUntil: { gt: new Date() } },
-      });
-      if (activeBoosts >= MAX_ACTIVE_BOOSTS_PER_USER) {
-        return withCORS(NextResponse.json({ message: 'BOOST_LIMIT_REACHED' }, { status: 400 }), req);
-      }
-      boostedAt = new Date();
-      boostedUntil = addDays(boostedAt, BOOST_DAYS);
-    }
 
     const listing = await prisma.listing.create({
       data: {
@@ -214,9 +203,7 @@ export async function POST(req: Request) {
         condition: condUp as Condition,
         status: 'ACTIVE',
         imageUrls: imgs,
-        category: catUp as Category,
-        boostedAt,
-        boostedUntil,
+        category: catUp as Category
       },
       include: { seller: { select: { id: true, name: true, avatarUrl: true } } },
     });

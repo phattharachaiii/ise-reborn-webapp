@@ -4,7 +4,7 @@ import { ApiError } from './http';
 export const badJson = () => new ApiError(400, 'BAD_JSON', 'ข้อมูล JSON ไม่ถูกต้อง');
 export const missingFields = (fields: string[]) =>
     new ApiError(400, 'MISSING_FIELDS', `กรอกข้อมูลไม่ครบ: ${fields.join(', ')}`);
-export const invalidCred = () => new ApiError(401, 'INVALID_CREDENTIALS', 'อีเมล/ชื่อผู้ใช้หรือรหัสผ่านไม่ถูกต้อง');
+export const invalidCred = () => new ApiError(401, 'The email or password you entered is incorrect', 'อีเมล/ชื่อผู้ใช้หรือรหัสผ่านไม่ถูกต้อง');
 export const forbidden = () => new ApiError(403, 'FORBIDDEN', 'ไม่มีสิทธิ์เข้าถึง');
 export const duplicate = (what: string) => new ApiError(409, `DUPLICATE_${what}`, `${what} นี้ถูกใช้แล้ว`);
 export const tooShortPwd = () => new ApiError(400, 'PASSWORD_TOO_SHORT', 'รหัสผ่านต้องยาวอย่างน้อย 8 ตัวอักษร');
