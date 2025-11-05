@@ -9,7 +9,6 @@ datasource db {
   url       = env("DATABASE_URL")
   directUrl = env("DIRECT_URL")
 }
-        
 
 // ===== enums =====
 enum Role {
@@ -41,21 +40,19 @@ enum Category {
   OTHERS
 }
 
-
 enum OfferStatus {
-  REQUESTED 
-  ACCEPTED 
+  REQUESTED
+  ACCEPTED
   REJECTED
-  REOFFER 
-  COMPLETED 
-  CANCELLED 
+  REOFFER
+  COMPLETED
+  CANCELLED
 }
 
 enum OfferActor {
   BUYER
   SELLER
 }
-
 
 enum NotificationType {
   OFFER_REQUESTED
@@ -65,7 +62,6 @@ enum NotificationType {
   OFFER_COMPLETED
 }
 
-
 enum ListingStatus {
   ACTIVE
   PENDING
@@ -73,17 +69,28 @@ enum ListingStatus {
   HIDDEN
 }
 
+enum ReportStatus {
+  PENDING
+  RESOLVED
+}
+
+enum ReportResolution {
+  UNBAN
+  TEMPSUSPEND
+  SUSPEND
+}
+
 // ===== models =====
 model User {
   id           String  @id @default(cuid())
   email        String  @unique
   passwordHash String
-  name         String? 
+  name         String?
   avatarUrl    String?
   bio          String?
 
-  orgDomain String? 
-  studentId String? 
+  orgDomain String?
+  studentId String?
 
   role          Role          @default(USER)
   accountStatus AccountStatus @default(ACTIVE)
@@ -97,8 +104,10 @@ model User {
   offersAsSeller Offer[]        @relation("OfferSeller")
   notifications  Notification[]
 
-  reportsAuthored Report[] @relation("ReportAuthor")
-  reportsAgainst  Report[] @relation("ReportTarget")
+  reportsAuthored Report[]    @relation("ReportAuthor")
+  reportsAgainst  Report[]    @relation("ReportTarget")
+  resolvedReports Report[]    @relation("ReportResolver")
+  reportLogs      ReportLog[] @relation("UserReportLogs")
 }
 
 model Listing {
@@ -111,14 +120,10 @@ model Listing {
   price       Int
   condition   Condition @default(USED)
 
-  // ใช้ enum ListingStatus เพื่อรองรับ PENDING หลัง offer ถูก ACCEPT
   status ListingStatus @default(ACTIVE)
 
   imageUrls String[] @default([])
   category  Category @default(OTHERS)
-
-  boostedUntil DateTime?
-  boostedAt    DateTime?
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -129,7 +134,6 @@ model Listing {
   @@index([status, createdAt])
   @@index([sellerId])
   @@index([category])
-  @@index([boostedUntil])
 }
 
 model Offer {
@@ -192,7 +196,8 @@ model Notification {
 }
 
 model Report {
-  id       String @id @default(cuid())
+  id String @id @default(cuid())
+
   authorId String
   author   User   @relation("ReportAuthor", fields: [authorId], references: [id], onDelete: Cascade)
 
@@ -202,8 +207,38 @@ model Report {
   reason  String
   details String?
 
+  evidenceImageUrls String[] @default([])
+
+  status         ReportStatus      @default(PENDING)
+  resolution     ReportResolution?
+  resolutionNote String?
+  resolvedById   String?
+  resolvedBy     User?             @relation("ReportResolver", fields: [resolvedById], references: [id])
+  resolvedAt     DateTime?
+
+  logs ReportLog[]
+
   createdAt DateTime @default(now())
 
   @@index([authorId])
   @@index([targetUserId, createdAt])
+  @@index([status, createdAt])
+}
+
+model ReportLog {
+  id String @id @default(cuid())
+
+  reportId String
+  report   Report @relation(fields: [reportId], references: [id], onDelete: Cascade)
+
+  actorId String?
+  actor   User?   @relation("UserReportLogs", fields: [actorId], references: [id], onDelete: SetNull)
+
+  action         String
+  prevResolution ReportResolution?
+  nextResolution ReportResolution?
+  reason         String?
+  createdAt      DateTime          @default(now())
+
+  @@index([reportId, createdAt])
 }

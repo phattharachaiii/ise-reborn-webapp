@@ -5,7 +5,7 @@
 	import { auth, openAuth, clearAuth } from '$lib/stores/auth';
 	import { withAvatarBuster } from '$lib/utils/avatar';
 	import NotificationsBell from './NotificationsBell.svelte';
-
+	import SearchBox from '$lib/components/SearchBox.svelte';
 	$: user = $auth.user;
 	$: pathname = $page.url.pathname;
 	$: isPost = pathname.startsWith('/post');
@@ -47,7 +47,7 @@
 		openAuth('register');
 	}
 
-	// ✅ Call logout API + clear store/LS
+	//  Call logout API + clear store/LS
 	async function handleLogout() {
 		try {
 			await fetch((import.meta as any).env.PUBLIC_BACKEND_ORIGIN + '/api/auth/logout', {
@@ -69,11 +69,7 @@
 		<!-- Center: Search (hidden on /post) -->
 		{#if !isPost}
 			<div class="flex-1 max-w-xl hidden md:block">
-				<input
-					placeholder="Search for secondhand items..."
-					aria-label="search"
-					class="w-full rounded-full border border-surface px-4 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[color:oklch(65%_0.2_60)]/30"
-				/>
+				<SearchBox />
 			</div>
 		{/if}
 
@@ -169,6 +165,18 @@
 								>
 									View All Offers
 								</a>
+								{#if user?.role === 'ADMIN'}
+									<a
+										href="/admin/users"
+										role="menuitem"
+										class="block rounded px-3 py-2 hover:bg-neutral-100"
+										on:click={() => (openMenu = false)}
+									>
+										Admin (User Management)
+									</a>
+								{/if}
+								<hr class="my-1 border-neutral-200" />
+
 								<hr class="my-1 border-neutral-200" />
 
 								<button
@@ -294,6 +302,17 @@
 								>
 									View All Offers
 								</a>
+								{#if user?.role === 'ADMIN'}
+									<a
+										href="/admin/users"
+										role="menuitem"
+										class="block rounded px-3 py-2 hover:bg-neutral-100"
+										on:click={() => (openMenu = false)}
+									>
+										Admin (User Management)
+									</a>
+								{/if}
+								<hr class="my-1 border-neutral-200" />
 
 								<hr class="my-1 border-neutral-200" />
 

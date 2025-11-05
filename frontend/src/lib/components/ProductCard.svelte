@@ -15,13 +15,11 @@
 		photoUrl?: string | null;
 
 		category?: string;
-		boostedUntil?: string | null;
 		seller?: { id: string; name: string } | null;
 	};
 </script>
 
 <script lang="ts">
-	// 👉 ถ้า parent เผลอส่ง undefined มา จะไม่ระเบิด แต่ขึ้น skeleton แทน
 	export let item: ProductCardInput | null | undefined;
 
 	const CAT_LABEL: Record<string, string> = {
@@ -133,7 +131,6 @@
 	}
 
 	// UI helpers
-	$: isBoosted = !!item?.boostedUntil && new Date(item!.boostedUntil!).getTime() > Date.now();
 	$: status = (item?.status || '').toUpperCase();
 	const STATUS_STYLE: Record<string, string> = {
 		ACTIVE: 'bg-green-50 text-green-700 border-green-200',
@@ -144,7 +141,6 @@
 </script>
 
 {#if !item}
-	<!-- skeleton card เมื่อยังไม่มีข้อมูล -->
 	<div class="block rounded-2xl border border-neutral-200/70 bg-white shadow-sm overflow-hidden">
 		<div class="h-48 md:h-56 w-full bg-neutral-100 animate-pulse"></div>
 		<div class="px-4 pt-3 pb-4 space-y-2">
@@ -200,7 +196,6 @@
 			{/if}
 		</div>
 
-		<!-- เนื้อหา -->
 		<div class="px-4 pt-3 pb-4">
 			<div class="flex items-start gap-2">
 				<h3
