@@ -1,11 +1,9 @@
-// backend/app/api/reports/[id]/route.ts
-import { NextRequest, NextResponse } from 'next/server';
+import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { getUserFromRequest } from '@/lib/auth';
-import type { ReportResolution, ReportStatus, AccountStatus } from '@prisma/client';
 
+// --- CORS helper (ถ้าคุณเรียกข้ามพอร์ต) ---
 const FE_ORIGIN = process.env.FE_ORIGIN || 'http://localhost:5173';
-
 function withCORS(res: NextResponse, allow: string[] = ['GET', 'PATCH', 'OPTIONS']) {
     res.headers.set('Access-Control-Allow-Origin', FE_ORIGIN);
     res.headers.set('Access-Control-Allow-Headers', 'Content-Type, Authorization');
@@ -18,165 +16,185 @@ export function OPTIONS() {
     return withCORS(NextResponse.json({ ok: true }));
 }
 
-// --- helpers ---
-const RES_STRS = ['UNBAN', 'TEMPSUSPEND', 'SUSPEND'] as const;
+// map resolution -> account status
+const resolutionToAccountStatus: Record<'UNBAN' | 'TEMPSUSPEND' | 'SUSPEND', 'ACTIVE' | 'TEMPSUSPEND' | 'SUSPENDED'> = {
+    UNBAN: 'ACTIVE',
+    TEMPSUSPEND: 'TEMPSUSPEND',
+    SUSPEND: 'SUSPENDED',
+};
 
-function parseResolution(v: unknown): ReportResolution | null {
-    if (typeof v !== 'string') return null;
-    const up = v.toUpperCase();
-    return (RES_STRS as readonly string[]).includes(up)
-        ? (up as ReportResolution)
-        : null;
+// GET /api/reports/[id]
+export async function GET(
+    _req: Request,
+    { params }: { params: { id: string } }
+) {
+    try {
+        const me = await getUserFromRequest(_req as any).catch(() => null);
+        if (!me || me.role !== 'ADMIN') {
+            return withCORS(NextResponse.json({ message: 'FORBIDDEN' }, { status: 403 }));
+        }
+
+        const rep = await prisma.report.findUnique({
+            where: { id: params.id },
+            include: {
+                author: { select: { id: true, name: true, email: true, avatarUrl: true } },
+                targetUser: { select: { id: true, name: true, email: true, avatarUrl: true, accountStatus: true } },
+                logs: {
+                    orderBy: { createdAt: 'desc' },
+                    include: { actor: { select: { id: true, name: true } } },
+                },
+                resolvedBy: { select: { id: true, name: true } },
+            },
+        });
+
+        if (!rep) {
+            return withCORS(NextResponse.json({ message: 'NOT_FOUND' }, { status: 404 }));
+        }
+
+        return withCORS(NextResponse.json({ report: rep }));
+    } catch (e: any) {
+        return withCORS(NextResponse.json({ message: e?.message || 'Server error' }, { status: 500 }));
+    }
 }
 
-const mapResToUserStatus = (r: ReportResolution): AccountStatus =>
-    r === 'UNBAN' ? 'ACTIVE' : r === 'TEMPSUSPEND' ? 'TEMPSUSPEND' : 'SUSPENDED';
+// PATCH /api/reports/[id]
+// body:
+// - ตัดสินครั้งแรก: { resolution: 'UNBAN'|'TEMPSUSPEND'|'SUSPEND', note: string }
+// - เปลี่ยนคำตัดสิน: { resolution: 'UNBAN'|'TEMPSUSPEND'|'SUSPEND', changeReason: string }
+export async function PATCH(
+    req: Request,
+    { params }: { params: { id: string } }
+) {
+    try {
+        const me = await getUserFromRequest(req as any).catch(() => null);
+        if (!me || me.role !== 'ADMIN') {
+            return withCORS(NextResponse.json({ message: 'FORBIDDEN' }, { status: 403 }));
+        }
 
-// --- GET /api/reports/[id] ---
-export async function GET(_req: NextRequest, ctx: { params: { id: string } }) {
-    const me = await getUserFromRequest(_req).catch(() => null);
-    if (!me || me.role !== 'ADMIN') {
-        return withCORS(NextResponse.json({ message: 'FORBIDDEN' }, { status: 403 }));
-    }
+        const body = await req.json().catch(() => ({}));
+        const { resolution, note, changeReason } = body as {
+            resolution?: 'UNBAN' | 'TEMPSUSPEND' | 'SUSPEND';
+            note?: string;
+            changeReason?: string;
+        };
 
-    const { id } = ctx.params;
+        if (!resolution || !['UNBAN', 'TEMPSUSPEND', 'SUSPEND'].includes(resolution)) {
+            return withCORS(NextResponse.json({ message: 'INVALID_RESOLUTION' }, { status: 400 }));
+        }
 
-    const report = await prisma.report.findUnique({
-        where: { id },
-        include: {
-            author: { select: { id: true, name: true, email: true, avatarUrl: true } },
-            targetUser: { select: { id: true, name: true, email: true, avatarUrl: true, accountStatus: true } },
-            logs: {
-                orderBy: { createdAt: 'desc' },
-                include: { actor: { select: { id: true, name: true } } }
+        const rep = await prisma.report.findUnique({
+            where: { id: params.id },
+            include: { targetUser: true },
+        });
+        if (!rep) {
+            return withCORS(NextResponse.json({ message: 'NOT_FOUND' }, { status: 404 }));
+        }
+
+        const now = new Date();
+
+        // ตัดสินครั้งแรก
+        if (rep.status === 'PENDING') {
+            if (!note || !note.trim()) {
+                return withCORS(NextResponse.json({ message: 'NOTE_REQUIRED' }, { status: 400 }));
             }
-        }
-    });
 
-    if (!report) {
-        return withCORS(NextResponse.json({ message: 'NOT_FOUND' }, { status: 404 }));
-    }
+            const updated = await prisma.$transaction(async (tx) => {
+                // อัปเดตสถานะ user
+                await tx.user.update({
+                    where: { id: rep.targetUserId },
+                    data: { accountStatus: resolutionToAccountStatus[resolution] },
+                });
 
-    return withCORS(NextResponse.json({ report }));
-}
+                // อัปเดตรายงาน
+                const r = await tx.report.update({
+                    where: { id: rep.id },
+                    data: {
+                        status: 'RESOLVED',
+                        resolution,
+                        resolutionNote: note,
+                        resolvedById: me.id,
+                        resolvedAt: now,
+                    },
+                    include: {
+                        author: { select: { id: true, name: true, email: true, avatarUrl: true } },
+                        targetUser: { select: { id: true, name: true, email: true, avatarUrl: true, accountStatus: true } },
+                        logs: {
+                            orderBy: { createdAt: 'desc' },
+                            include: { actor: { select: { id: true, name: true } } },
+                        },
+                        resolvedBy: { select: { id: true, name: true } },
+                    },
+                });
 
-// --- PATCH /api/reports/[id] ---
-// First decision: { resolution: 'UNBAN'|'TEMPSUSPEND'|'SUSPEND', note: string }
-// Change decision: { resolution: 'UNBAN'|'TEMPSUSPEND'|'SUSPEND', changeReason: string }
-export async function PATCH(req: NextRequest, ctx: { params: { id: string } }) {
-    const me = await getUserFromRequest(req).catch(() => null);
-    if (!me || me.role !== 'ADMIN') {
-        return withCORS(NextResponse.json({ message: 'FORBIDDEN' }, { status: 403 }));
-    }
+                // log
+                await tx.reportLog.create({
+                    data: {
+                        reportId: rep.id,
+                        action: 'RESOLVE',
+                        prevResolution: null,
+                        nextResolution: resolution,
+                        reason: note,
+                        actorId: me.id,
+                    },
+                });
 
-    const { id } = ctx.params;
+                return r;
+            });
 
-    const body = await req.json().catch(() => null);
-    if (!body) {
-        return withCORS(NextResponse.json({ message: 'BAD_JSON' }, { status: 400 }));
-    }
-
-    const newRes = parseResolution(body?.resolution);
-    if (!newRes) {
-        return withCORS(NextResponse.json({ message: 'INVALID_RESOLUTION' }, { status: 400 }));
-    }
-
-    const note: string | undefined = typeof body?.note === 'string' ? body.note : undefined;
-    const changeReason: string | undefined = typeof body?.changeReason === 'string' ? body.changeReason : undefined;
-
-    const report = await prisma.report.findUnique({
-        where: { id },
-        include: { targetUser: { select: { id: true, accountStatus: true } } }
-    });
-
-    if (!report) {
-        return withCORS(NextResponse.json({ message: 'NOT_FOUND' }, { status: 404 }));
-    }
-
-    // First resolution (PENDING -> RESOLVED) requires note
-    if (report.status === 'PENDING') {
-        if (!note?.trim()) {
-            return withCORS(NextResponse.json({ message: 'NOTE_REQUIRED' }, { status: 400 }));
+            return withCORS(NextResponse.json({ report: updated }));
         }
 
-        const userStatus = mapResToUserStatus(newRes);
+        // เปลี่ยนคำตัดสิน
+        if (!changeReason || !changeReason.trim()) {
+            return withCORS(NextResponse.json({ message: 'CHANGE_REASON_REQUIRED' }, { status: 400 }));
+        }
 
-        const [updatedReport] = await prisma.$transaction([
-            prisma.report.update({
-                where: { id },
+        const prev = rep.resolution ?? null;
+
+        const updated = await prisma.$transaction(async (tx) => {
+            // อัปเดตสถานะ user
+            await tx.user.update({
+                where: { id: rep.targetUserId },
+                data: { accountStatus: resolutionToAccountStatus[resolution] },
+            });
+
+            // อัปเดตรายงาน (ยังคง RESOLVED)
+            const r = await tx.report.update({
+                where: { id: rep.id },
                 data: {
-                    status: 'RESOLVED' as ReportStatus,
-                    resolution: newRes,
-                    resolutionNote: note,
+                    resolution,
+                    resolutionNote: changeReason,
                     resolvedById: me.id,
-                    resolvedAt: new Date(),
-                    logs: {
-                        create: {
-                            actorId: me.id,
-                            action: 'RESOLVE',
-                            // prevResolution omitted on first decision
-                            nextResolution: newRes,
-                            reason: note
-                        }
-                    }
+                    resolvedAt: now,
                 },
                 include: {
-                    author: { select: { id: true, name: true } },
-                    targetUser: { select: { id: true, name: true, accountStatus: true } },
-                    logs: { orderBy: { createdAt: 'desc' }, include: { actor: { select: { id: true, name: true } } } }
-                }
-            }),
-            prisma.user.update({
-                where: { id: report.targetUserId },
-                data: { accountStatus: userStatus },
-                select: { id: true, accountStatus: true }
-            })
-        ]);
+                    author: { select: { id: true, name: true, email: true, avatarUrl: true } },
+                    targetUser: { select: { id: true, name: true, email: true, avatarUrl: true, accountStatus: true } },
+                    logs: {
+                        orderBy: { createdAt: 'desc' },
+                        include: { actor: { select: { id: true, name: true } } },
+                    },
+                    resolvedBy: { select: { id: true, name: true } },
+                },
+            });
 
-        return withCORS(NextResponse.json({ report: updatedReport }));
+            // log
+            await tx.reportLog.create({
+                data: {
+                    reportId: rep.id,
+                    action: 'CHANGE',
+                    prevResolution: prev,
+                    nextResolution: resolution,
+                    reason: changeReason,
+                    actorId: me.id,
+                },
+            });
+
+            return r;
+        });
+
+        return withCORS(NextResponse.json({ report: updated }));
+    } catch (e: any) {
+        return withCORS(NextResponse.json({ message: e?.message || 'Server error' }, { status: 500 }));
     }
-
-    // Change decision (RESOLVED -> RESOLVED)
-    const prev: ReportResolution | undefined = report.resolution ?? undefined;
-    if (!changeReason?.trim()) {
-        return withCORS(NextResponse.json({ message: 'CHANGE_REASON_REQUIRED' }, { status: 400 }));
-    }
-    if (prev === newRes) {
-        return withCORS(NextResponse.json({ message: 'SAME_RESOLUTION' }, { status: 400 }));
-    }
-
-    const userStatus = mapResToUserStatus(newRes);
-
-    const [changedReport] = await prisma.$transaction([
-        prisma.report.update({
-            where: { id },
-            data: {
-                resolution: newRes,
-                resolutionNote: changeReason,
-                resolvedById: me.id,
-                resolvedAt: new Date(),
-                logs: {
-                    create: {
-                        actorId: me.id,
-                        action: 'CHANGE',
-                        prevResolution: prev,
-                        nextResolution: newRes,
-                        reason: changeReason
-                    }
-                }
-            },
-            include: {
-                author: { select: { id: true, name: true } },
-                targetUser: { select: { id: true, name: true, accountStatus: true } },
-                logs: { orderBy: { createdAt: 'desc' }, include: { actor: { select: { id: true, name: true } } } }
-            }
-        }),
-        prisma.user.update({
-            where: { id: report.targetUserId },
-            data: { accountStatus: userStatus },
-            select: { id: true, accountStatus: true }
-        })
-    ]);
-
-    return withCORS(NextResponse.json({ report: changedReport }));
 }
