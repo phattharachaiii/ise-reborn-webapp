@@ -10,14 +10,8 @@
 4. [Environment Variables](#environment-variables)  
    - [Frontend `.env`](#frontend-env)  
    - [Backend `.env`](#backend-env)  
-5. [Development](#development)  
-6. [Build & Deploy](#build--deploy)  
-7. [API Basics](#api-basics)  
-8. [CORS & “Fail to fetch” Checklist](#cors--fail-to-fetch-checklist)  
-9. [Database & Prisma](#database--prisma)  
-10. [Scripts](#scripts)  
-11. [Troubleshooting](#troubleshooting)  
-12. [License](#license)
+5. [Build & Deploy](#build--deploy)  
+6. [Database & Prisma](#database--prisma)
 
 ---
 
